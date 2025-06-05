@@ -1,0 +1,14 @@
+# Database connection
+mysql-connector-python>=8.0.0
+
+# LLM API
+openai>=1.0.0
+
+# SQL parsing and security check
+sqlparse>=0.4.0
+
+# Result formatting
+tabulate>=0.9.0
+
+# Optional: better table display
+rich>=10.0.0 
