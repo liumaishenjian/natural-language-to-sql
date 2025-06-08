@@ -1,0 +1,3857 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>自然语言转SQL查询工具</title>
+    <link href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- jsTree CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jstree/3.3.15/themes/default/style.min.css">
+    <!-- jQuery (jsTree 依赖) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <!-- jsTree JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jstree/3.3.15/jstree.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* 模态框样式 */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.hidden {
+            display: none;
+        }
+
+        .modal-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+        }
+
+        .modal-content {
+            position: relative;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow: hidden;
+            animation: modalSlideIn 0.3s ease;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: scale(0.95) translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px 24px;
+            border-bottom: 1px solid #e5e7eb;
+            background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            color: #1e293b;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 20px;
+            color: #64748b;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+        }
+
+        .modal-close:hover {
+            background: #e2e8f0;
+            color: #334155;
+        }
+
+        .modal-body {
+            padding: 24px;
+        }
+
+        :root {
+            --primary-color: #007AFF;
+            --secondary-color: #5856D6;
+            --success-color: #34C759;
+            --warning-color: #FF9500;
+            --error-color: #FF3B30;
+            --text-primary: #1D1D1F;
+            --text-secondary: #6E6E73;
+            --background: #FBFBFD;
+            --surface: #FFFFFF;
+            --border: #D2D2D7;
+            --shadow: rgba(0, 0, 0, 0.1);
+            --radius: 12px;
+            --radius-large: 16px;
+        }
+
+        body {
+            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, var(--background) 0%, #F2F2F7 100%);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 48px;
+        }
+
+        .header h1 {
+            font-size: 2.75rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 12px;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header p {
+            font-size: 1.125rem;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 32px;
+            margin-bottom: 32px;
+        }
+
+        @media (max-width: 1024px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            /* 三列布局的响应式设计 */
+            #query-tab > div:first-child {
+                grid-template-columns: 1fr !important;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--surface);
+            border-radius: var(--radius-large);
+            padding: 32px;
+            box-shadow: 0 4px 20px var(--shadow);
+            border: 1px solid var(--border);
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 40px var(--shadow);
+        }
+
+        .card-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .card-title i {
+            font-size: 1.25rem;
+            color: var(--primary-color);
+        }
+
+        .query-section {
+            grid-column: 1 / -1;
+        }
+
+        .query-input {
+            width: 100%;
+            min-height: 120px;
+            padding: 20px;
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
+            font-size: 1rem;
+            font-family: inherit;
+            resize: vertical;
+            transition: all 0.3s ease;
+            background: var(--surface);
+        }
+
+        .query-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
+        }
+
+        .button {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 16px 32px;
+            border-radius: var(--radius);
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+
+        .button:hover {
+            background: #0056CC;
+            transform: translateY(-1px);
+        }
+
+        .button:active {
+            transform: translateY(0);
+        }
+
+        .button.secondary {
+            background: var(--text-secondary);
+        }
+
+        .button.secondary:hover {
+            background: #515154;
+        }
+
+        .button.success {
+            background: var(--success-color);
+        }
+
+        .button.success:hover {
+            background: #28A745;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .status-card {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            border: none;
+            position: relative;
+        }
+        
+        .status-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.05));
+            border-radius: inherit;
+            pointer-events: none;
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .status-item:last-child {
+            border-bottom: none;
+        }
+
+        .status-label {
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.95);
+            font-size: 0.95rem;
+        }
+
+        .status-value {
+            font-weight: 600;
+            background: rgba(255, 255, 255, 0.25);
+            color: rgba(255, 255, 255, 1);
+            padding: 6px 14px;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        }
+        
+        .status-value.status-success {
+            background: rgba(255, 255, 255, 0.3);
+            color: #E8F5E8;
+            border-color: rgba(179, 255, 218, 0.3);
+            box-shadow: 0 0 8px rgba(179, 255, 218, 0.2);
+        }
+        
+        .status-value.status-warning {
+            background: rgba(255, 255, 255, 0.3);
+            color: #FFF8DC;
+            border-color: rgba(255, 229, 179, 0.3);
+            box-shadow: 0 0 8px rgba(255, 229, 179, 0.2);
+        }
+        
+        .status-value.status-error {
+            background: rgba(255, 255, 255, 0.3);
+            color: #FFE4E1;
+            border-color: rgba(255, 179, 186, 0.3);
+            box-shadow: 0 0 8px rgba(255, 179, 186, 0.2);
+        }
+
+        .results-section {
+            grid-column: 1 / -1;
+            margin-top: 32px;
+        }
+
+        .sql-display {
+            background: #1E1E1E;
+            color: #D4D4D4;
+            padding: 20px;
+            border-radius: var(--radius);
+            font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+            font-size: 0.875rem;
+            margin-bottom: 20px;
+            overflow-x: auto;
+            border: 1px solid #333;
+        }
+
+        .table-container {
+            overflow-x: auto;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            background: var(--surface);
+        }
+
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.875rem;
+        }
+
+        .results-table th {
+            background: #F8F9FA;
+            padding: 16px 12px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-primary);
+            border-bottom: 2px solid var(--border);
+        }
+
+        .results-table td {
+            padding: 12px;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-secondary);
+        }
+
+        .results-table tr:hover {
+            background: #F8F9FA;
+        }
+
+        .error-message {
+            background: #FFF5F5;
+            border: 1px solid #FEB2B2;
+            border-radius: var(--radius);
+            padding: 16px;
+            color: #C53030;
+            margin-top: 20px;
+        }
+
+        .success-message {
+            background: #F0FFF4;
+            border: 1px solid #9AE6B4;
+            border-radius: var(--radius);
+            padding: 16px;
+            color: #38A169;
+            margin-top: 20px;
+        }
+
+        .loading {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top: 2px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none;
+        }
+
+
+
+        .schema-content {
+            max-height: 400px;
+            overflow-y: auto;
+            background: #F8F9FA;
+            padding: 16px;
+            border-radius: var(--radius);
+            font-family: monospace;
+            font-size: 0.875rem;
+            white-space: pre-wrap;
+        }
+
+        .example-queries {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        .example-query {
+            background: #F8F9FA;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.875rem;
+        }
+
+        .example-query:hover {
+            background: var(--primary-color);
+            color: white;
+            transform: translateY(-1px);
+        }
+
+        .format-selector {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .format-btn {
+            padding: 8px 16px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            border-radius: var(--radius);
+            cursor: pointer;
+            font-size: 0.875rem;
+            transition: all 0.3s ease;
+        }
+
+        .format-btn.active {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        .config-select {
+            width: 100%;
+            padding: 6px 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 13px;
+            background: white;
+            transition: all 0.3s ease;
+        }
+
+        .config-select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.1);
+        }
+
+        /* 表选择器样式 */
+        #tables-container {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px;
+            background: #fafafa;
+        }
+
+        /* 自定义滚动条样式 */
+        #tables-container::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        #tables-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 3px;
+        }
+
+        #tables-container::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 3px;
+        }
+
+        #tables-container::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+
+        .table-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            margin: 6px 0;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            background: white;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .table-item:hover {
+            background: #f8f9fa;
+            border-color: var(--primary-color);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+        }
+
+        .table-item.selected {
+            background: linear-gradient(135deg, #e3f2fd 0%, #f0f7ff 100%);
+            border-color: var(--primary-color);
+            box-shadow: 0 2px 8px rgba(0, 122, 255, 0.2);
+        }
+
+        .table-item.selected:hover {
+            background: linear-gradient(135deg, #bbdefb 0%, #e3f2fd 100%);
+        }
+
+        .table-checkbox {
+            margin-right: 12px;
+            transform: scale(1.2);
+            accent-color: var(--primary-color);
+        }
+
+        .table-info {
+            flex: 1;
+            min-width: 0; /* 允许文本截断 */
+        }
+
+        .table-name {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+
+        .table-item.selected .table-name {
+            color: var(--primary-color);
+        }
+
+        .table-details {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 2px;
+        }
+
+        .table-item.selected .table-details {
+            color: #1976d2;
+        }
+
+        .table-columns-preview {
+            font-size: 11px;
+            color: #999;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
+        }
+
+        .table-item.selected .table-columns-preview {
+            color: #1565c0;
+        }
+
+        /* 选中数量显示 */
+        #selected-tables-info {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 12px;
+            padding: 8px 12px;
+            background: #f0f7ff;
+            border-radius: 6px;
+            border-left: 4px solid var(--primary-color);
+        }
+
+        #selected-count {
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+
+        /* 表选择器动画效果 */
+        .table-item {
+            animation: tableItemFadeIn 0.3s ease-out;
+        }
+
+        @keyframes tableItemFadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* 选中状态的脉冲效果 */
+        .table-item.selected {
+            animation: tableItemFadeIn 0.3s ease-out, selectedPulse 2s ease-in-out infinite;
+        }
+
+        @keyframes selectedPulse {
+            0%, 100% {
+                box-shadow: 0 2px 8px rgba(0, 122, 255, 0.2);
+            }
+            50% {
+                box-shadow: 0 4px 12px rgba(0, 122, 255, 0.4);
+            }
+        }
+
+        /* 模态框样式 */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            backdrop-filter: blur(5px);
+            animation: modalFadeIn 0.3s ease-out;
+        }
+
+        .modal.hidden {
+            display: none;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 0;
+            width: 90%;
+            max-width: 900px;
+            max-height: 90%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            animation: modalSlideIn 0.3s ease-out;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 24px 32px;
+            border-bottom: 1px solid #e0e0e0;
+            background: #f8f9fa;
+            border-radius: 12px 12px 0 0;
+        }
+
+        .modal-title {
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .modal-title::before {
+            content: '🗄️';
+            font-size: 1.2em;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+            padding: 8px;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+            line-height: 1;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .close-btn:hover {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .schema-content {
+            flex: 1;
+            overflow-y: auto;
+            background: #f8f9fa;
+            padding: 20px;
+            color: #333;
+            border-radius: 0 0 12px 12px;
+        }
+
+        /* Navicat 风格的数据库管理界面 */
+        .schema-content {
+            display: flex;
+            height: 600px;
+            background: #f8f9fb;
+            border-radius: 0 0 12px 12px;
+            overflow: hidden;
+        }
+
+        /* 左侧导航面板 */
+        .db-navigator {
+            width: 280px;
+            background: #ffffff;
+            border-right: 1px solid #e1e5e9;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .nav-header {
+            padding: 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-weight: 600;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nav-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+        }
+
+        /* 右侧详情面板 */
+        .db-details {
+            flex: 1;
+            background: #ffffff;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .details-header {
+            padding: 16px 20px;
+            background: #f8f9fb;
+            border-bottom: 1px solid #e1e5e9;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .details-title {
+            font-weight: 600;
+            color: #2c3e50;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .details-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .details-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0;
+        }
+
+        /* 标签页样式 */
+        .details-tabs {
+            display: flex;
+            background: #f8f9fb;
+            border-bottom: 1px solid #e1e5e9;
+        }
+
+        .tab-btn {
+            padding: 12px 20px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            color: #64748b;
+            transition: all 0.2s ease;
+            border-bottom: 2px solid transparent;
+            position: relative;
+        }
+
+        .tab-btn:hover {
+            color: #334155;
+            background: rgba(102, 126, 234, 0.05);
+        }
+
+        .tab-btn.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+            background: rgba(102, 126, 234, 0.1);
+        }
+
+        .tab-content {
+            padding: 20px;
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* 现代化树形结构 */
+        .db-tree-item {
+            display: flex;
+            align-items: center;
+            padding: 6px 12px;
+            margin: 0;
+            border-radius: 0;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 13px;
+            user-select: none;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .db-tree-item:first-child {
+            border-radius: 6px 6px 0 0;
+        }
+
+        .db-tree-item:last-child {
+            border-radius: 0 0 6px 6px;
+            border-bottom: none;
+        }
+
+        .db-tree-item:hover {
+            background: #f0f3ff;
+        }
+
+        .db-tree-item.selected {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+        }
+
+        .tree-icon {
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        .tree-icon.database {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+        }
+
+        .tree-icon.table {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+            color: white;
+        }
+
+        .tree-icon.column {
+            background: #e8f0fe;
+            color: #1565c0;
+        }
+
+        .tree-icon.primary-key {
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+            color: white;
+        }
+
+        .tree-label {
+            flex: 1;
+            font-weight: 500;
+        }
+
+        .tree-meta {
+            font-size: 11px;
+            color: #64748b;
+            background: #f1f5f9;
+            padding: 2px 6px;
+            border-radius: 10px;
+            margin-left: 8px;
+        }
+
+        .db-tree-item.selected .tree-meta {
+            background: rgba(255, 255, 255, 0.2);
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        /* 子节点缩进 */
+        .tree-children {
+            margin-left: 16px;
+            border-left: 2px solid #f1f5f9;
+            padding-left: 8px;
+        }
+
+        .tree-children .db-tree-item {
+            margin: 0;
+            padding: 5px 12px;
+        }
+
+        .tree-children .db-tree-item:first-child {
+            border-radius: 0;
+        }
+
+        .tree-children .db-tree-item:last-child {
+            border-radius: 0;
+        }
+
+        /* 表详情卡片 */
+        .table-info-card {
+            background: white;
+            border: 1px solid #e1e5e9;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+
+        .card-header {
+            padding: 16px 20px;
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border-bottom: 1px solid #e1e5e9;
+            font-weight: 600;
+            color: #334155;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-content {
+            padding: 0;
+            overflow: hidden;
+        }
+
+        .table-wrapper {
+            width: 100%;
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+            border: 1px solid #e1e5e9;
+            border-radius: 6px;
+        }
+
+        .table-wrapper::-webkit-scrollbar {
+            height: 8px;
+        }
+
+        .table-wrapper::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 4px;
+        }
+
+        .table-wrapper::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+
+        .table-wrapper::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        /* 现代化表格 */
+        .modern-table {
+            width: 100%;
+            min-width: 800px;
+            border-collapse: collapse;
+            font-size: 13px;
+            white-space: nowrap;
+            border: none;
+        }
+
+        .modern-table th {
+            background: #f8fafc;
+            color: #475569;
+            font-weight: 600;
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid #e1e5e9;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .modern-table td {
+            padding: 8px 16px;
+            border-bottom: 1px solid #f1f5f9;
+            color: #334155;
+        }
+
+        .modern-table tr:hover {
+            background: #f8fafc;
+        }
+
+        /* 数据类型标签 */
+        .type-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+            font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+        }
+
+        .type-badge.string {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .type-badge.number {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .type-badge.date {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        /* 键类型标签 */
+        .key-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 500;
+        }
+
+        .key-badge.primary {
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+            color: white;
+        }
+
+        .key-badge.index {
+            background: #e0e7ff;
+            color: #4338ca;
+        }
+
+        /* 工具栏按钮 */
+        .toolbar-btn {
+            padding: 6px 10px;
+            background: white;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            color: #374151;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .toolbar-btn:hover {
+            background: #f9fafb;
+            border-color: #667eea;
+            color: #667eea;
+        }
+
+        .toolbar-btn.primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: transparent;
+        }
+
+        .toolbar-btn.primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        /* 空状态 */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #64748b;
+        }
+
+        .empty-state i {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .empty-state h3 {
+            margin: 0 0 8px 0;
+            font-weight: 600;
+            color: #334155;
+        }
+
+        .empty-state p {
+            margin: 0;
+            font-size: 14px;
+        }
+
+        /* 查询模式切换器 */
+        .query-mode-switch {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+            padding: 12px 16px;
+            background: #f8f9fb;
+            border-radius: 8px;
+            border: 1px solid #e1e5e9;
+        }
+
+        .switch-label {
+            font-size: 13px;
+            font-weight: 500;
+            color: #334155;
+        }
+
+        .mode-toggle {
+            position: relative;
+            display: inline-flex;
+            background: #ffffff;
+            border-radius: 6px;
+            padding: 2px;
+            border: 1px solid #d1d5db;
+        }
+
+        .mode-option {
+            padding: 6px 12px;
+            font-size: 12px;
+            font-weight: 500;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            color: #64748b;
+            background: transparent;
+            border: none;
+        }
+
+        .mode-option.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3);
+        }
+
+        .mode-option:hover:not(.active) {
+            background: #f1f5f9;
+            color: #334155;
+        }
+
+        .mode-info {
+            flex: 1;
+            font-size: 11px;
+            color: #64748b;
+        }
+
+        .mode-info.sql-mode {
+            color: #dc2626;
+        }
+
+        .mode-info.nl-mode {
+            color: #059669;
+        }
+
+        /* 导航标签页 */
+        .nav-tabs {
+            display: flex;
+            background: #f8f9fb;
+            border-radius: 8px 8px 0 0;
+            border: 1px solid #e1e5e9;
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+
+        .nav-tab {
+            flex: 1;
+            padding: 12px 20px;
+            text-align: center;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            color: #64748b;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .nav-tab:first-child {
+            border-radius: 8px 0 0 0;
+        }
+
+        .nav-tab:last-child {
+            border-radius: 0 8px 0 0;
+        }
+
+        .nav-tab.active {
+            background: white;
+            color: #667eea;
+            box-shadow: 0 2px 4px rgba(102, 126, 234, 0.1);
+        }
+
+        .nav-tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: #667eea;
+        }
+
+        .nav-tab:hover:not(.active) {
+            background: #f1f5f9;
+            color: #334155;
+        }
+
+        .nav-tab i {
+            margin-right: 6px;
+        }
+
+        /* 页面内容 */
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* 数据库配置表单 */
+        .db-config-form {
+            background: white;
+            border: 1px solid #e1e5e9;
+            border-radius: 0 0 8px 8px;
+            padding: 24px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: #334155;
+            margin-bottom: 6px;
+        }
+
+        .form-input, .form-select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.2s ease;
+            background: white;
+        }
+
+        .form-input:focus, .form-select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 20px;
+        }
+
+        .connection-status.connected {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .connection-status.disconnected {
+            background: #fef2f2;
+            color: #dc2626;
+        }
+
+        .connection-status.testing {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-secondary {
+            background: #f8f9fb;
+            color: #64748b;
+            border: 1px solid #d1d5db;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-secondary:hover {
+            background: #f1f5f9;
+            color: #334155;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-success:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+
+        .form-help {
+            font-size: 12px;
+            color: #64748b;
+            margin-top: 4px;
+        }
+
+        /* 自定义滚动条 - 模态框内容 */
+        .schema-content::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .schema-content::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+
+        .schema-content::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+        }
+
+        .schema-content::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+
+        /* 模态框动画 */
+        @keyframes modalFadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-50px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .modal-content {
+                width: 95%;
+                max-height: 95%;
+                margin: 20px;
+            }
+
+            .modal-header {
+                padding: 16px 20px;
+            }
+
+            .modal-title {
+                font-size: 1.25rem;
+            }
+
+            .schema-content {
+                padding: 16px 20px;
+                font-size: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>自然语言转SQL查询工具</h1>
+            <p>使用自然语言描述您的查询需求，AI将自动生成并执行SQL语句</p>
+        </div>
+
+        <!-- 导航标签页 -->
+        <div class="nav-tabs">
+            <button id="tab-query" class="nav-tab active" onclick="switchTabSafe(this, 'query')">
+                <i class="fas fa-search"></i>
+                SQL查询
+            </button>
+            <button id="tab-database" class="nav-tab" onclick="switchTabSafe(this, 'database')">
+                <i class="fas fa-database"></i>
+                数据库配置
+            </button>
+            <button id="tab-model" class="nav-tab" onclick="switchTabSafe(this, 'model')">
+                <i class="fas fa-robot"></i>
+                模型配置
+            </button>
+        </div>
+
+                <!-- 查询页面 -->
+        <div id="query-tab" class="tab-content active">
+            <!-- 三列布局 -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; margin-bottom: 32px;">
+                
+                <!-- 系统状态 - 精简版 -->
+                <div class="card status-card">
+                    <div class="card-title" style="position: relative; z-index: 1;">
+                        <i class="fas fa-heartbeat"></i>
+                        系统状态
+                    </div>
+                    <div id="status-content" style="position: relative; z-index: 1;">
+                        <div class="status-item">
+                            <span class="status-label">状态</span>
+                            <span class="status-value" id="init-status">检查中...</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">模型</span>
+                            <span class="status-value" id="model-status">-</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">数据库</span>
+                            <span class="status-value" id="database-status">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 快捷操作 - 精简版 -->
+                <div class="card">
+                    <div class="card-title">
+                        <i class="fas fa-tools"></i>
+                        快捷操作
+                    </div>
+                    
+                    <!-- 模型配置区域 - 精简版 -->
+                    <div style="margin-bottom: 16px; padding: 12px; background: #f8f9fa; border-radius: 6px;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+                            <select id="backend-select" class="config-select" style="font-size: 12px; padding: 6px;">
+                                <option value="ollama">Ollama</option>
+                                <option value="qwen_api">通义千问</option>
+                                <option value="gemini">Gemini</option>
+                            </select>
+                            <select id="model-select" class="config-select" style="font-size: 12px; padding: 6px;">
+                                <option value="qwen2">qwen2</option>
+                            </select>
+                        </div>
+                        
+                        <!-- API Key 设置区域 -->
+                        <div id="api-key-section" style="margin-bottom: 8px; display: none;">
+                            <div style="font-size: 11px; color: #555; margin-bottom: 4px; font-weight: 500;">
+                                <span id="api-key-label">API Key</span>
+                                <span id="api-key-hint" style="color: #888; font-weight: normal;"></span>
+                            </div>
+                            <div style="position: relative;">
+                                <input type="password" id="api-key-input" class="config-select" 
+                                       placeholder="API Key..." style="padding-right: 30px; font-size: 12px; padding-top: 6px; padding-bottom: 6px;">
+                                <button type="button" onclick="toggleApiKeyVisibility()" 
+                                        style="position: absolute; right: 6px; top: 50%; transform: translateY(-50%); 
+                                               background: none; border: none; cursor: pointer; color: #666; font-size: 10px;">
+                                    <i class="fas fa-eye" id="api-key-toggle-icon"></i>
+                                </button>
+                            </div>
+                            <div style="font-size: 10px; color: #666; margin-top: 4px; text-align: center;">
+                                <span id="api-key-link">
+                                    <a href="#" target="_blank" id="api-key-url" style="color: #007AFF;">获取API Key</a>
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <div style="display: grid; grid-template-columns: 1fr auto; gap: 4px;">
+                            <button class="button" style="font-size: 12px; padding: 6px 12px;" onclick="reinitializeWithConfig()">
+                                <i class="fas fa-sync"></i> 应用配置
+                            </button>
+                            <button class="button secondary" style="font-size: 10px; padding: 6px 8px;" onclick="updateModelSelect()" title="手动刷新模型列表">
+                                🔄
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div style="display: grid; gap: 8px;">
+                        <button class="button secondary" onclick="showSchema()" style="font-size: 12px; padding: 8px;">
+                            <i class="fas fa-database"></i> 数据库结构
+                        </button>
+                        <button class="button secondary" onclick="showModelsInline();" style="font-size: 12px; padding: 8px;">
+                            <i class="fas fa-cogs"></i> 模型管理
+                        </button>
+                        <button class="button success" onclick="reinitialize()" style="font-size: 12px; padding: 8px;">
+                            <i class="fas fa-refresh"></i> 重新初始化
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 示例查询 - 独立卡片 -->
+                <div class="card">
+                    <div class="card-title">
+                        <i class="fas fa-lightbulb"></i>
+                        示例查询
+                    </div>
+                    <div class="example-queries">
+                        <div class="example-query" onclick="setQuery('查询所有用户信息')">
+                            查询所有用户信息
+                        </div>
+                        <div class="example-query" onclick="setQuery('统计每个部门的人数')">
+                            统计每个部门的人数
+                        </div>
+                        <div class="example-query" onclick="setQuery('查找最近一周的订单')">
+                            查找最近一周的订单
+                        </div>
+                        <div class="example-query" onclick="setQuery('显示销售额最高的产品')">
+                            显示销售额最高的产品
+                        </div>
+                        <div class="example-query" onclick="setQuery('查询库存不足的商品')">
+                            查询库存不足的商品
+                        </div>
+                        <div class="example-query" onclick="setQuery('显示月销售趋势')">
+                            显示月销售趋势
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        <!-- 查询区域 -->
+        <div class="card query-section">
+            <div class="card-title">
+                <i class="fas fa-search"></i>
+                <span id="query-title">自然语言查询</span>
+            </div>
+            
+            <!-- 查询模式切换器 -->
+            <div class="query-mode-switch">
+                <span class="switch-label">查询模式：</span>
+                <div class="mode-toggle">
+                    <button class="mode-option active" onclick="switchQueryMode('nl')">
+                        <i class="fas fa-comments"></i> 自然语言
+                    </button>
+                    <button class="mode-option" onclick="switchQueryMode('sql')">
+                        <i class="fas fa-code"></i> SQL查询
+                    </button>
+                </div>
+                <div class="mode-info nl-mode" id="mode-info">
+                    💡 使用自然语言描述您的查询需求，AI将自动生成SQL
+                </div>
+            </div>
+            
+            <textarea 
+                id="query-input" 
+                class="query-input" 
+                placeholder="请输入您的查询需求，例如：查询所有用户信息，统计每个部门的人数等..."
+            ></textarea>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px;">
+                <div class="format-selector">
+                    <span style="font-weight: 500; margin-right: 12px;">结果格式：</span>
+                    <button class="format-btn active" data-format="table">表格</button>
+                    <button class="format-btn" data-format="json">JSON</button>
+                    <button class="format-btn" data-format="csv">CSV</button>
+                </div>
+                
+                <div style="display: flex; gap: 8px;">
+                    <button id="tables-btn" class="button secondary" onclick="showTablesModal()" style="font-size: 12px; padding: 8px 12px;">
+                        <i class="fas fa-table"></i>
+                        <span id="tables-btn-text">选择表结构</span>
+                        <span id="tables-count" style="display: none; margin-left: 4px; background: var(--primary-color); color: white; padding: 2px 6px; border-radius: 10px; font-size: 10px;">0</span>
+                    </button>
+                    <button id="query-btn" class="button" onclick="executeQuery()">
+                        <i class="fas fa-play"></i>
+                        执行查询
+                    </button>
+                </div>
+            </div>
+        </div>
+
+            <!-- 结果区域 -->
+            <div id="results-section" class="card results-section hidden">
+                <div class="card-title">
+                    <i class="fas fa-table"></i>
+                    查询结果
+                </div>
+                <div id="results-content"></div>
+            </div>
+        </div>
+
+        <!-- 数据库配置页面 -->
+        <div id="database-tab" class="tab-content">
+            <div class="db-config-form">
+                <h2 style="margin: 0 0 20px 0; color: #334155;">
+                    <i class="fas fa-database" style="margin-right: 8px;"></i>
+                    数据库连接配置
+                </h2>
+                
+                <!-- 连接状态显示 -->
+                <div id="db-connection-status" class="connection-status disconnected">
+                    <i class="fas fa-times-circle"></i>
+                    <span>数据库未连接</span>
+                </div>
+                
+                <form id="db-config-form">
+                    <div class="form-group">
+                        <label class="form-label">数据库类型</label>
+                        <select id="db-type" class="form-select" onchange="updateDatabaseType()">
+                            <option value="mysql">MySQL</option>
+                            <option value="postgresql">PostgreSQL</option>
+                            <option value="sqlite">SQLite</option>
+                            <option value="mssql">SQL Server</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">主机地址</label>
+                            <input type="text" id="db-host" class="form-input" value="localhost" placeholder="localhost">
+                            <div class="form-help">数据库服务器的IP地址或域名</div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">端口</label>
+                            <input type="number" id="db-port" class="form-input" value="3306" placeholder="3306">
+                            <div class="form-help">数据库服务器端口号</div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">数据库名称</label>
+                        <input type="text" id="db-name" class="form-input" placeholder="请输入数据库名称">
+                        <div class="form-help">要连接的数据库名称</div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">用户名</label>
+                            <input type="text" id="db-username" class="form-input" placeholder="请输入用户名">
+                            <div class="form-help">数据库登录用户名</div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">密码</label>
+                            <input type="password" id="db-password" class="form-input" placeholder="请输入密码">
+                            <div class="form-help">数据库登录密码</div>
+                        </div>
+                    </div>
+                    
+                    <div id="sqlite-file-group" class="form-group" style="display: none;">
+                        <label class="form-label">SQLite文件路径</label>
+                        <input type="text" id="db-file" class="form-input" placeholder="./database.db">
+                        <div class="form-help">SQLite数据库文件的完整路径</div>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="button" class="btn-primary" onclick="testDatabaseConnection()">
+                            <i class="fas fa-plug"></i>
+                            测试连接
+                        </button>
+                        <button type="button" class="btn-success" onclick="saveDatabaseConfig()">
+                            <i class="fas fa-save"></i>
+                            保存配置
+                        </button>
+                        <button type="button" class="btn-secondary" onclick="loadDatabaseConfig()">
+                            <i class="fas fa-download"></i>
+                            加载配置
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- 模型配置页面 -->
+        <div id="model-tab" class="tab-content">
+            <div class="db-config-form">
+                <h2 style="margin: 0 0 20px 0; color: #334155;">
+                    <i class="fas fa-robot" style="margin-right: 8px;"></i>
+                    AI模型配置
+                </h2>
+                
+                <form id="model-config-form">
+                    <div class="form-group">
+                        <label class="form-label">模型后端</label>
+                        <select id="model-backend" class="form-select" onchange="updateModelBackendConfig()">
+                            <option value="ollama">Ollama (本地模型)</option>
+                            <option value="qwen_api">通义千问 (在线API)</option>
+                            <option value="gemini">Google Gemini (在线API)</option>
+                        </select>
+                        <div class="form-help">选择要使用的AI模型后端服务</div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">模型名称</label>
+                            <select id="model-name" class="form-select">
+                                <option value="qwen2">qwen2</option>
+                            </select>
+                            <div class="form-help">选择具体的模型版本</div>
+                        </div>
+                        <div class="form-group" id="ollama-url-group">
+                            <label class="form-label">Ollama服务地址</label>
+                            <input type="text" id="ollama-url" class="form-input" value="http://localhost:11434" placeholder="http://localhost:11434">
+                            <div class="form-help">Ollama服务运行的地址和端口</div>
+                        </div>
+                    </div>
+                    
+                    <div id="api-key-config-group" class="form-group" style="display: none;">
+                        <label class="form-label">
+                            <span id="api-key-config-label">API Key</span>
+                        </label>
+                        <div style="position: relative;">
+                            <input type="password" id="api-key-config" class="form-input" placeholder="请输入API Key...">
+                            <button type="button" onclick="toggleApiKeyConfigVisibility()" 
+                                    style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); 
+                                           background: none; border: none; cursor: pointer; color: #64748b;">
+                                <i class="fas fa-eye" id="api-key-config-toggle-icon"></i>
+                            </button>
+                        </div>
+                        <div class="form-help">
+                            <span id="api-key-config-hint">可选，未设置将使用环境变量</span>
+                            <br>
+                            <a href="#" target="_blank" id="api-key-config-url" style="color: #667eea;">获取API Key</a>
+                        </div>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="button" class="btn-primary" onclick="testModelConnection()">
+                            <i class="fas fa-plug"></i>
+                            测试连接
+                        </button>
+                        <button type="button" class="btn-success" onclick="saveModelConfig()">
+                            <i class="fas fa-save"></i>
+                            保存配置
+                        </button>
+                        <button type="button" class="btn-secondary" onclick="loadModelConfig()">
+                            <i class="fas fa-download"></i>
+                            加载配置
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 模态框 -->
+    <div id="schema-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">数据库结构</h3>
+                <button class="close-btn" onclick="closeModal('schema-modal')">×</button>
+            </div>
+            <div id="schema-content" class="schema-content">
+                加载中...
+            </div>
+        </div>
+    </div>
+
+
+
+    <script>
+        console.log('=== JavaScript文件已加载 ===');
+        
+        // 全局变量：当前查询模式
+        let currentQueryMode = 'nl'; // 'nl' = 自然语言, 'sql' = SQL查询
+
+        // 安全的标签页切换函数
+        function switchTabSafe(clickedButton, tabName) {
+            console.log('安全切换标签页:', tabName);
+            console.log('点击的按钮:', clickedButton);
+            
+            try {
+                // 移除所有按钮的active状态
+                const queryBtn = document.getElementById('tab-query');
+                const databaseBtn = document.getElementById('tab-database');
+                const modelBtn = document.getElementById('tab-model');
+                
+                if (queryBtn) queryBtn.classList.remove('active');
+                if (databaseBtn) databaseBtn.classList.remove('active');
+                if (modelBtn) modelBtn.classList.remove('active');
+                
+                // 移除所有内容的active状态
+                const queryContent = document.getElementById('query-tab');
+                const databaseContent = document.getElementById('database-tab');
+                const modelContent = document.getElementById('model-tab');
+                
+                if (queryContent) queryContent.classList.remove('active');
+                if (databaseContent) databaseContent.classList.remove('active');
+                if (modelContent) modelContent.classList.remove('active');
+                
+                // 激活当前按钮和对应内容
+                if (clickedButton) {
+                    clickedButton.classList.add('active');
+                }
+                
+                if (tabName === 'query' && queryContent) {
+                    queryContent.classList.add('active');
+                } else if (tabName === 'database' && databaseContent) {
+                    databaseContent.classList.add('active');
+                    // 延迟加载数据库配置
+                    setTimeout(() => {
+                        if (typeof loadDatabaseConfig === 'function') {
+                            loadDatabaseConfig();
+                        }
+                    }, 100);
+                } else if (tabName === 'model' && modelContent) {
+                    modelContent.classList.add('active');
+                    // 延迟加载模型配置
+                    setTimeout(() => {
+                        if (typeof loadModelConfig === 'function') {
+                            loadModelConfig();
+                        }
+                    }, 100);
+                }
+                
+                console.log('✅ 标签页切换成功:', tabName);
+                
+            } catch (error) {
+                console.error('❌ 标签页切换失败:', error);
+            }
+        }
+
+        // 数据库类型变化时更新端口
+        function updateDatabaseType() {
+            const dbType = document.getElementById('db-type').value;
+            const portInput = document.getElementById('db-port');
+            const sqliteGroup = document.getElementById('sqlite-file-group');
+            const hostGroup = document.querySelector('#db-host').parentElement.parentElement;
+            
+            // 根据数据库类型设置默认端口
+            const defaultPorts = {
+                'mysql': 3306,
+                'postgresql': 5432,
+                'sqlite': '',
+                'mssql': 1433
+            };
+            
+            if (dbType === 'sqlite') {
+                sqliteGroup.style.display = 'block';
+                hostGroup.style.display = 'none';
+            } else {
+                sqliteGroup.style.display = 'none';
+                hostGroup.style.display = 'flex';
+                portInput.value = defaultPorts[dbType] || '';
+            }
+        }
+
+        // 测试数据库连接
+        async function testDatabaseConnection() {
+            const statusDiv = document.getElementById('db-connection-status');
+            const testBtn = event.target;
+            const originalContent = testBtn.innerHTML;
+            
+            // 收集配置数据
+            const config = {
+                type: document.getElementById('db-type').value,
+                host: document.getElementById('db-host').value,
+                port: parseInt(document.getElementById('db-port').value),
+                database: document.getElementById('db-name').value,
+                username: document.getElementById('db-username').value,
+                password: document.getElementById('db-password').value,
+                file: document.getElementById('db-file').value
+            };
+            
+            try {
+                // 更新状态
+                statusDiv.className = 'connection-status testing';
+                statusDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>正在测试连接...</span>';
+                testBtn.disabled = true;
+                testBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 测试中...';
+                
+                const response = await fetch('/api/test-db-connection', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(config),
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    statusDiv.className = 'connection-status connected';
+                    statusDiv.innerHTML = '<i class="fas fa-check-circle"></i><span>数据库连接成功</span>';
+                } else {
+                    statusDiv.className = 'connection-status disconnected';
+                    statusDiv.innerHTML = `<i class="fas fa-times-circle"></i><span>连接失败: ${data.error}</span>`;
+                }
+                
+            } catch (error) {
+                statusDiv.className = 'connection-status disconnected';
+                statusDiv.innerHTML = `<i class="fas fa-times-circle"></i><span>连接错误: ${error.message}</span>`;
+            } finally {
+                testBtn.disabled = false;
+                testBtn.innerHTML = originalContent;
+            }
+        }
+
+        // 保存数据库配置
+        async function saveDatabaseConfig() {
+            const config = {
+                type: document.getElementById('db-type').value,
+                host: document.getElementById('db-host').value,
+                port: parseInt(document.getElementById('db-port').value),
+                database: document.getElementById('db-name').value,
+                username: document.getElementById('db-username').value,
+                password: document.getElementById('db-password').value,
+                file: document.getElementById('db-file').value
+            };
+            
+            try {
+                const response = await fetch('/api/save-db-config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(config),
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('数据库配置保存成功！');
+                } else {
+                    alert('保存失败: ' + data.error);
+                }
+                
+            } catch (error) {
+                alert('保存错误: ' + error.message);
+            }
+        }
+
+        // 加载数据库配置
+        async function loadDatabaseConfig() {
+            try {
+                const response = await fetch('/api/get-db-config');
+                const data = await response.json();
+                
+                if (data.success && data.config) {
+                    const config = data.config;
+                    document.getElementById('db-type').value = config.type || 'mysql';
+                    document.getElementById('db-host').value = config.host || 'localhost';
+                    document.getElementById('db-port').value = config.port || 3306;
+                    document.getElementById('db-name').value = config.database || '';
+                    document.getElementById('db-username').value = config.username || '';
+                    document.getElementById('db-password').value = config.password || '';
+                    document.getElementById('db-file').value = config.file || '';
+                    
+                    updateDatabaseType();
+                }
+                
+            } catch (error) {
+                console.error('加载数据库配置失败:', error);
+            }
+        }
+
+        // 更新模型后端配置
+        function updateModelBackendConfig() {
+            const backend = document.getElementById('model-backend').value;
+            const modelSelect = document.getElementById('model-name');
+            const ollamaGroup = document.getElementById('ollama-url-group');
+            const apiKeyGroup = document.getElementById('api-key-config-group');
+            const apiKeyLabel = document.getElementById('api-key-config-label');
+            const apiKeyHint = document.getElementById('api-key-config-hint');
+            const apiKeyUrl = document.getElementById('api-key-config-url');
+            
+            // 清空模型选择器
+            modelSelect.innerHTML = '';
+            
+            // 根据后端类型配置
+            const configs = {
+                'ollama': {
+                    models: ['qwen2', 'llama2', 'codellama', 'mistral'],
+                    showOllama: true,
+                    showApiKey: false
+                },
+                'qwen_api': {
+                    models: ['qwen-turbo', 'qwen-plus', 'qwen-max'],
+                    showOllama: false,
+                    showApiKey: true,
+                    apiKeyLabel: '通义千问 API Key',
+                    apiKeyHint: '可选，未设置将使用环境变量 DASHSCOPE_API_KEY',
+                    apiKeyUrl: 'https://dashscope.aliyun.com/'
+                },
+                'gemini': {
+                    models: ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro'],
+                    showOllama: false,
+                    showApiKey: true,
+                    apiKeyLabel: 'Google Gemini API Key',
+                    apiKeyHint: '可选，未设置将使用环境变量 GEMINI_API_KEY',
+                    apiKeyUrl: 'https://makersuite.google.com/app/apikey'
+                }
+            };
+            
+            const config = configs[backend];
+            
+            // 添加模型选项
+            config.models.forEach(model => {
+                const option = document.createElement('option');
+                option.value = model;
+                option.textContent = model;
+                modelSelect.appendChild(option);
+            });
+            
+            // 显示/隐藏配置组
+            ollamaGroup.style.display = config.showOllama ? 'block' : 'none';
+            apiKeyGroup.style.display = config.showApiKey ? 'block' : 'none';
+            
+            // 更新API Key配置
+            if (config.showApiKey) {
+                apiKeyLabel.textContent = config.apiKeyLabel;
+                apiKeyHint.textContent = config.apiKeyHint;
+                apiKeyUrl.href = config.apiKeyUrl;
+            }
+        }
+
+        // 切换API Key可见性
+        function toggleApiKeyConfigVisibility() {
+            const input = document.getElementById('api-key-config');
+            const icon = document.getElementById('api-key-config-toggle-icon');
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.className = 'fas fa-eye-slash';
+            } else {
+                input.type = 'password';
+                icon.className = 'fas fa-eye';
+            }
+        }
+
+        // 测试模型连接
+        async function testModelConnection() {
+            const testBtn = event.target;
+            const originalContent = testBtn.innerHTML;
+            
+            const config = {
+                backend: document.getElementById('model-backend').value,
+                model: document.getElementById('model-name').value,
+                ollama_url: document.getElementById('ollama-url').value,
+                api_key: document.getElementById('api-key-config').value
+            };
+            
+            try {
+                testBtn.disabled = true;
+                testBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 测试中...';
+                
+                const response = await fetch('/api/test-model-connection', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(config),
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('模型连接测试成功！');
+                } else {
+                    alert('连接失败: ' + data.error);
+                }
+                
+            } catch (error) {
+                alert('连接错误: ' + error.message);
+            } finally {
+                testBtn.disabled = false;
+                testBtn.innerHTML = originalContent;
+            }
+        }
+
+        // 保存模型配置
+        async function saveModelConfig() {
+            const config = {
+                backend: document.getElementById('model-backend').value,
+                model: document.getElementById('model-name').value,
+                ollama_url: document.getElementById('ollama-url').value,
+                api_key: document.getElementById('api-key-config').value
+            };
+            
+            try {
+                const response = await fetch('/api/save-model-config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(config),
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('模型配置保存成功！');
+                } else {
+                    alert('保存失败: ' + data.error);
+                }
+                
+            } catch (error) {
+                alert('保存错误: ' + error.message);
+            }
+        }
+
+        // 加载模型配置
+        async function loadModelConfig() {
+            try {
+                const response = await fetch('/api/get-model-config');
+                const data = await response.json();
+                
+                if (data.success && data.config) {
+                    const config = data.config;
+                    document.getElementById('model-backend').value = config.backend || 'ollama';
+                    document.getElementById('ollama-url').value = config.ollama_url || 'http://localhost:11434';
+                    document.getElementById('api-key-config').value = config.api_key || '';
+                    
+                    updateModelBackendConfig();
+                    
+                    if (config.model) {
+                        document.getElementById('model-name').value = config.model;
+                    }
+                }
+                
+            } catch (error) {
+                console.error('加载模型配置失败:', error);
+            }
+        }
+
+                // 切换查询模式
+        function switchQueryMode(mode) {
+            currentQueryMode = mode;
+            
+            // 移除所有模式按钮的active状态
+            const allModeButtons = document.querySelectorAll('.mode-option');
+            allModeButtons.forEach(btn => btn.classList.remove('active'));
+            
+            // 根据mode激活对应按钮
+            if (mode === 'nl') {
+                allModeButtons[0].classList.add('active');
+            } else if (mode === 'sql') {
+                allModeButtons[1].classList.add('active');
+            }
+                
+            // 更新界面文本和提示
+            const queryTitle = document.getElementById('query-title');
+            const queryInput = document.getElementById('query-input');
+            const modeInfo = document.getElementById('mode-info');
+            const queryBtn = document.getElementById('query-btn');
+            
+            if (mode === 'sql') {
+                queryTitle.textContent = 'SQL查询';
+                queryInput.placeholder = '请输入SQL查询语句，例如：SELECT * FROM users WHERE age > 25';
+                modeInfo.textContent = '⚡ 直接执行SQL查询语句，支持SELECT、INSERT、UPDATE、DELETE等操作';
+                modeInfo.className = 'mode-info sql-mode';
+                queryBtn.innerHTML = '<i class="fas fa-play"></i> 执行SQL';
+            } else {
+                queryTitle.textContent = '自然语言查询';
+                queryInput.placeholder = '请输入您的查询需求，例如：查询所有用户信息，统计每个部门的人数等...';
+                modeInfo.textContent = '💡 使用自然语言描述您的查询需求，AI将自动生成SQL';
+                modeInfo.className = 'mode-info nl-mode';
+                queryBtn.innerHTML = '<i class="fas fa-play"></i> 执行查询';
+            }
+            
+            // 清空输入框
+            queryInput.value = '';
+            
+            console.log('查询模式切换完成:', mode);
+        }
+
+        
+
+        
+        // 在页面内显示模型信息（不使用模态框）
+        async function showModelsInline() {
+            console.log('=== 内联显示模型信息 ===');
+            
+            const resultsSection = document.getElementById('results-section');
+            const resultsContent = document.getElementById('results-content');
+            
+            try {
+                // 显示加载状态
+                resultsContent.innerHTML = '<div style="text-align: center; padding: 20px;">🔄 正在获取模型信息...</div>';
+                resultsSection.classList.remove('hidden');
+                resultsSection.scrollIntoView({ behavior: 'smooth' });
+                
+                console.log('正在调用模型API...');
+                const response = await fetch('/api/models');
+                const data = await response.json();
+                
+                console.log('模型API响应:', data);
+                
+                if (data.success && data.models) {
+                    let html = `
+                        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                            <h3 style="margin: 0 0 16px 0; color: #333;">🤖 模型管理信息</h3>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
+                                <div><strong>后端类型:</strong> ${data.backend}</div>
+                                <div><strong>当前模型:</strong> ${data.current}</div>
+                                <div><strong>可用模型:</strong> ${data.models.length} 个</div>
+                                <div><strong>状态:</strong> ✅ 正常</div>
+                            </div>
+                        </div>
+                        
+                        <h4 style="margin-bottom: 16px;">📋 可用模型列表</h4>
+                        <div style="display: grid; gap: 8px;">
+                    `;
+                    
+                    data.models.forEach((model, index) => {
+                        const isCurrent = model === data.current;
+                        html += `
+                            <div style="
+                                padding: 12px 16px; 
+                                background: ${isCurrent ? '#e3f2fd' : '#ffffff'}; 
+                                border: 1px solid ${isCurrent ? '#2196f3' : '#e0e0e0'}; 
+                                border-radius: 6px;
+                                display: flex;
+                                justify-content: space-between;
+                                align-items: center;
+                            ">
+                                <span style="font-family: monospace; ${isCurrent ? 'font-weight: 600;' : ''}">${model}</span>
+                                ${isCurrent ? '<span style="color: #2196f3; font-size: 12px;">● 当前使用</span>' : ''}
+                            </div>
+                        `;
+                    });
+                    
+                    html += '</div>';
+                    resultsContent.innerHTML = html;
+                } else {
+                    resultsContent.innerHTML = `
+                        <div style="background: #ffebee; color: #c62828; padding: 20px; border-radius: 8px;">
+                            <h3 style="margin: 0 0 10px 0;">❌ 获取模型信息失败</h3>
+                            <p>错误信息: ${data.error || '未知错误'}</p>
+                        </div>
+                    `;
+                }
+                
+            } catch (error) {
+                console.error('获取模型信息失败:', error);
+                resultsContent.innerHTML = `
+                    <div style="background: #ffebee; color: #c62828; padding: 20px; border-radius: 8px;">
+                        <h3 style="margin: 0 0 10px 0;">❌ 连接失败</h3>
+                        <p>无法连接到服务器: ${error.message}</p>
+                    </div>
+                `;
+                resultsSection.classList.remove('hidden');
+                resultsSection.scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+        
+
+        
+        let currentFormat = 'table';
+
+        // 模型配置映射
+        const modelConfigs = {
+            'ollama': ['qwen2', 'llama2', 'codellama', 'mistral'],
+            'qwen_api': ['qwen-turbo', 'qwen-plus', 'qwen-max'],
+            'gemini': [
+                'gemini-1.5-flash', 
+                'gemini-1.5-pro', 
+                'gemini-pro',
+                'gemini-2.5-flash-preview-05-20',
+                'gemini-2.0-flash-preview-image-generation'
+            ]
+        };
+
+        // API Key配置信息
+        const apiKeyConfigs = {
+            'ollama': {
+                show: false,
+                label: 'API Key',
+                url: '#',
+                hint: '本地模型无需API Key'
+            },
+            'qwen_api': {
+                show: true,
+                label: '通义千问 API Key',
+                url: 'https://dashscope.aliyun.com/',
+                hint: '可选，未设置将使用环境变量 DASHSCOPE_API_KEY'
+            },
+            'gemini': {
+                show: true,
+                label: 'Google Gemini API Key',
+                url: 'https://makersuite.google.com/app/apikey',
+                hint: '可选，未设置将使用环境变量 GEMINI_API_KEY'
+            }
+        };
+
+        // 更新模型选择器
+        function updateModelSelect() {
+            const backendSelect = document.getElementById('backend-select');
+            const modelSelect = document.getElementById('model-select');
+            
+            if (!backendSelect || !modelSelect) {
+                console.error('❌ 找不到后端或模型选择器元素');
+                return;
+            }
+            
+            const selectedBackend = backendSelect.value;
+            console.log('🔄 更新模型选择器，当前后端:', selectedBackend);
+            
+            // 清空现有选项
+            modelSelect.innerHTML = '';
+            
+            // 添加对应后端的模型选项
+            const models = modelConfigs[selectedBackend] || [];
+            console.log('📋 找到模型列表:', models);
+            
+            if (models.length === 0) {
+                console.warn('⚠️ 没有找到对应的模型配置');
+                const option = document.createElement('option');
+                option.value = '';
+                option.textContent = '暂无可用模型';
+                modelSelect.appendChild(option);
+            } else {
+                models.forEach(model => {
+                    const option = document.createElement('option');
+                    option.value = model;
+                    option.textContent = model;
+                    modelSelect.appendChild(option);
+                    console.log('✅ 添加模型选项:', model);
+                });
+            }
+            
+            // 更新API Key区域
+            updateApiKeySection(selectedBackend);
+            console.log('✅ 模型选择器更新完成');
+        }
+
+        // 更新API Key设置区域
+        function updateApiKeySection(backend) {
+            const apiKeySection = document.getElementById('api-key-section');
+            const apiKeyLabel = document.getElementById('api-key-label');
+            const apiKeyHint = document.getElementById('api-key-hint');
+            const apiKeyUrl = document.getElementById('api-key-url');
+            const apiKeyInput = document.getElementById('api-key-input');
+            
+            console.log('🔑 更新API Key区域，后端:', backend);
+            
+            const config = apiKeyConfigs[backend];
+            
+            if (!config) {
+                console.warn('⚠️ 没有找到对应的API Key配置');
+                return;
+            }
+            
+            if (config.show) {
+                console.log('✅ 显示API Key区域');
+                apiKeySection.style.display = 'block';
+                if (apiKeyLabel) apiKeyLabel.textContent = config.label;
+                if (apiKeyHint) apiKeyHint.textContent = `(${config.hint})`;
+                if (apiKeyUrl) apiKeyUrl.href = config.url;
+                if (apiKeyInput) apiKeyInput.placeholder = `请输入${config.label}...`;
+            } else {
+                console.log('🚫 隐藏API Key区域');
+                apiKeySection.style.display = 'none';
+                if (apiKeyInput) apiKeyInput.value = ''; // 清空输入
+            }
+        }
+
+        // 切换API Key可见性
+        function toggleApiKeyVisibility() {
+            const apiKeyInput = document.getElementById('api-key-input');
+            const toggleIcon = document.getElementById('api-key-toggle-icon');
+            
+            if (apiKeyInput.type === 'password') {
+                apiKeyInput.type = 'text';
+                toggleIcon.classList.remove('fa-eye');
+                toggleIcon.classList.add('fa-eye-slash');
+            } else {
+                apiKeyInput.type = 'password';
+                toggleIcon.classList.remove('fa-eye-slash');
+                toggleIcon.classList.add('fa-eye');
+            }
+        }
+
+        // 使用配置重新初始化
+        async function reinitializeWithConfig() {
+            const backend = document.getElementById('backend-select').value;
+            const model = document.getElementById('model-select').value;
+            const apiKey = document.getElementById('api-key-input').value.trim();
+            
+            console.log('使用配置重新初始化:', { backend, model, hasApiKey: !!apiKey });
+            
+            const button = event.target.closest('button');
+            const originalText = button.innerHTML;
+            
+            // 显示加载状态
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 保存并初始化...';
+            button.disabled = true;
+            
+            try {
+                // 先保存API Key配置到config.ini（如果有的话）
+                if (apiKey) {
+                    console.log('保存API Key配置...');
+                    const saveResponse = await fetch('/api/save-model-config', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            backend: backend,
+                            api_key: apiKey
+                        }),
+                    });
+                    
+                    const saveData = await saveResponse.json();
+                    if (saveData.success) {
+                        console.log('✅ API Key配置已保存到config.ini');
+                    } else {
+                        console.warn('⚠️ API Key保存失败:', saveData.error);
+                    }
+                }
+                
+                // 然后执行初始化
+                const requestBody = {
+                    backend: backend,
+                    model: model
+                };
+                
+                // 如果输入了API Key，就发送
+                if (apiKey) {
+                    requestBody.api_key = apiKey;
+                }
+                
+                const response = await fetch('/api/initialize', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showSuccess(`系统已切换到 ${backend} - ${model} 并初始化成功！配置已保存。`);
+                    // 更新状态显示
+                    setTimeout(checkStatus, 1000);
+                } else {
+                    showError(`初始化失败: ${data.message}`);
+                }
+                
+            } catch (error) {
+                console.error('配置初始化失败:', error);
+                showError(`初始化失败: ${error.message}`);
+            } finally {
+                // 恢复按钮状态
+                button.innerHTML = originalText;
+                button.disabled = false;
+            }
+        }
+
+        // 页面加载时检查状态
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('=== DOM内容已加载 ===');
+            
+            // 延迟一点确保所有DOM元素都完全渲染
+            setTimeout(() => {
+                checkStatus();
+                
+                // 初始化模型选择器
+                updateModelSelect();
+                
+                // 加载API Key配置到前端
+                loadApiKeyFromConfig();
+                
+                // 加载表信息
+                loadTables();
+                
+                // 后端变化时更新模型选择器和加载对应API Key
+                const backendSelect = document.getElementById('backend-select');
+                const modelSelect = document.getElementById('model-select');
+                
+                console.log('🔍 检查DOM元素:');
+                console.log('backend-select存在:', !!backendSelect);
+                console.log('model-select存在:', !!modelSelect);
+                
+                if (backendSelect) {
+                    backendSelect.addEventListener('change', function() {
+                        console.log('🔄 后端选择器发生变化，新值:', this.value);
+                        updateModelSelect();
+                        loadApiKeyFromConfig();
+                    });
+                    console.log('✅ 后端选择器事件监听器已绑定');
+                } else {
+                    console.error('❌ 找不到backend-select元素');
+                }
+                
+                // 格式选择器事件
+                document.querySelectorAll('.format-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        document.querySelectorAll('.format-btn').forEach(b => b.classList.remove('active'));
+                        this.classList.add('active');
+                        currentFormat = this.dataset.format;
+                    });
+                });
+                
+                console.log('=== DOM事件监听器已设置 ===');
+                
+                // 检查模型管理按钮并重新绑定事件
+                setTimeout(() => {
+                    const buttons = document.querySelectorAll('.button.secondary');
+                    console.log('找到的按钮数量:', buttons.length);
+                    buttons.forEach((btn, index) => {
+                        console.log(`按钮${index}:`, btn.textContent.trim(), '点击事件:', btn.onclick);
+                    });
+                }, 1000);
+            }, 100);
+        });
+
+        // 检查系统状态
+        async function checkStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                
+                // 更新基本状态
+                document.getElementById('init-status').textContent = data.initialized ? '已初始化' : '未初始化';
+                document.getElementById('model-status').textContent = data.model || '-';
+                
+                // 更新数据库状态，包含连接状态
+                let dbStatus = data.database || '-';
+                if (data.initialized && data.db_connected !== undefined) {
+                    dbStatus += data.db_connected ? ' 🟢' : ' 🔴';
+                }
+                document.getElementById('database-status').textContent = dbStatus;
+                
+                // 设置状态颜色 - 使用CSS类控制样式
+                const initElement = document.getElementById('init-status');
+                // 先清除所有状态类
+                initElement.classList.remove('status-success', 'status-warning', 'status-error');
+                
+                if (!data.initialized) {
+                    initElement.classList.add('status-error');
+                } else if (data.initialized && data.db_connected && data.ai_connected) {
+                    initElement.classList.add('status-success');
+                } else {
+                    initElement.classList.add('status-warning');
+                }
+                
+                // 更新模型状态，包含AI连接状态 - 使用高对比度颜色
+                const modelElement = document.getElementById('model-status');
+                if (data.initialized && data.ai_connected !== undefined) {
+                    modelElement.textContent = (data.model || '-') + (data.ai_connected ? ' 🟢' : ' 🔴');
+                    // 移除颜色设置，让文字保持默认的白色
+                    modelElement.style.color = '';
+                }
+                
+                // 同步前端配置选择器
+                if (data.backend) {
+                    const backendSelect = document.getElementById('backend-select');
+                    const modelSelect = document.getElementById('model-select');
+                    
+                    if (backendSelect.value !== data.backend) {
+                        backendSelect.value = data.backend;
+                        updateModelSelect();
+                    }
+                    
+                    if (data.model && modelSelect.value !== data.model) {
+                        // 如果模型列表中有这个模型，就选中它
+                        const modelOption = Array.from(modelSelect.options).find(option => option.value === data.model);
+                        if (modelOption) {
+                            modelSelect.value = data.model;
+                        }
+                    }
+                }
+                
+            } catch (error) {
+                console.error('检查状态失败:', error);
+                showError('无法连接到服务器');
+            }
+        }
+        
+        // 重新初始化系统
+        async function reinitialize() {
+            console.log('=== 开始重新初始化 ===');
+            
+            // 显示加载状态
+            const button = event.target.closest('button');
+            const originalText = button.innerHTML;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 初始化中...';
+            button.disabled = true;
+            
+            try {
+                const response = await fetch('/api/initialize', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        backend: 'ollama',
+                        model: 'qwen2'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showSuccess('系统重新初始化成功！');
+                    // 更新状态显示
+                    setTimeout(checkStatus, 1000);
+                } else {
+                    showError(`重新初始化失败: ${data.message}`);
+                }
+                
+            } catch (error) {
+                console.error('重新初始化失败:', error);
+                showError(`重新初始化失败: ${error.message}`);
+            } finally {
+                // 恢复按钮状态
+                button.innerHTML = originalText;
+                button.disabled = false;
+            }
+        }
+
+        // 执行查询
+        async function executeQuery() {
+            const query = document.getElementById('query-input').value.trim();
+            
+            if (!query) {
+                showError(currentQueryMode === 'sql' ? '请输入SQL查询语句' : '请输入查询内容');
+                return;
+            }
+            
+            // 根据模式选择不同的处理方式
+            if (currentQueryMode === 'sql') {
+                await executeSqlQuery(query);
+            } else {
+                await executeNaturalLanguageQuery(query);
+            }
+        }
+
+        // 执行SQL查询
+        async function executeSqlQuery(sqlQuery) {
+            const resultsSection = document.getElementById('results-section');
+            const resultsContent = document.getElementById('results-content');
+            const queryBtn = document.getElementById('query-btn');
+            
+            try {
+                // 显示加载状态
+                queryBtn.disabled = true;
+                queryBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 执行中...';
+                
+                resultsContent.innerHTML = '<div style="text-align: center; padding: 40px; color: #666;"><i class="fas fa-spinner fa-spin" style="font-size: 24px; margin-bottom: 16px;"></i><br/>正在执行SQL查询...</div>';
+                resultsSection.classList.remove('hidden');
+                resultsSection.scrollIntoView({ behavior: 'smooth' });
+                
+                const response = await fetch('/api/execute-sql', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        sql: sqlQuery,
+                        format: currentFormat
+                    }),
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayResults(data, sqlQuery);
+                } else {
+                    showError(data.error || 'SQL执行失败');
+                }
+                
+            } catch (error) {
+                console.error('SQL查询错误:', error);
+                showError('执行SQL查询时发生错误: ' + error.message);
+            } finally {
+                queryBtn.disabled = false;
+                queryBtn.innerHTML = '<i class="fas fa-play"></i> 执行SQL';
+            }
+        }
+
+        // 执行自然语言查询
+        async function executeNaturalLanguageQuery(nlQuery) {
+            const resultsSection = document.getElementById('results-section');
+            const resultsContent = document.getElementById('results-content');
+            const queryBtn = document.getElementById('query-btn');
+            const originalContent = queryBtn.innerHTML;
+            
+            // 显示加载状态
+            queryBtn.innerHTML = '<div class="loading"><div class="spinner"></div>正在查询...</div>';
+            queryBtn.disabled = true;
+
+            try {
+                // 获取选中的表
+                const selectedTablesList = getSelectedTables();
+                
+                const response = await fetch('/api/query', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                                    body: JSON.stringify({
+                    query: nlQuery,
+                        format: currentFormat,
+                        selected_tables: selectedTablesList
+                    }),
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayResults(data);
+                } else {
+                    showError(data.error);
+                }
+            } catch (error) {
+                console.error('查询失败:', error);
+                showError('查询请求失败');
+            } finally {
+                // 恢复按钮状态
+                queryBtn.innerHTML = originalContent;
+                queryBtn.disabled = false;
+            }
+        }
+
+        // 显示查询结果
+        function displayResults(data) {
+            console.log('=== 显示查询结果 ===');
+            console.log('收到的数据:', JSON.stringify(data, null, 2));
+            
+            const resultsSection = document.getElementById('results-section');
+            const resultsContent = document.getElementById('results-content');
+            
+            let html = '';
+            
+            // 显示生成的SQL
+            if (data.sql) {
+                html += `
+                    <div style="margin-bottom: 20px;">
+                        <h4 style="margin-bottom: 8px; color: var(--text-secondary);">生成的SQL语句：</h4>
+                        <div class="sql-display">${escapeHtml(data.sql)}</div>
+                    </div>
+                `;
+            }
+            
+            // 检查是否有结构化数据
+            if (data.columns && data.rows) {
+                console.log('找到结构化数据，列:', data.columns, '行数:', data.rows.length);
+                html += `
+                    <div style="margin-bottom: 16px;">
+                        <h4 style="color: var(--text-secondary);">查询结果 (${data.row_count || data.rows.length} 条记录):</h4>
+                    </div>
+                    <div class="table-container">
+                        <table class="results-table">
+                            <thead>
+                                <tr>
+                                    ${data.columns.map(col => `<th>${escapeHtml(col)}</th>`).join('')}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${data.rows.map(row => `
+                                    <tr>
+                                        ${row.map(cell => `<td>${escapeHtml(String(cell || ''))}</td>`).join('')}
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            } else if (data.result) {
+                console.log('没有结构化数据，尝试解析文本结果');
+                // 如果没有结构化数据，尝试解析文本结果
+                const parsedData = parseTextResult(data.result);
+                if (parsedData) {
+                    console.log('解析到的数据:', parsedData);
+                    html += `
+                        <div style="margin-bottom: 16px;">
+                            <h4 style="color: var(--text-secondary);">查询结果 (${parsedData.rows.length} 条记录):</h4>
+                        </div>
+                        <div class="table-container">
+                            <table class="results-table">
+                                <thead>
+                                    <tr>
+                                        ${parsedData.columns.map(col => `<th>${escapeHtml(col)}</th>`).join('')}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${parsedData.rows.map(row => `
+                                        <tr>
+                                            ${row.map(cell => `<td>${escapeHtml(String(cell || ''))}</td>`).join('')}
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+                } else {
+                    console.log('无法解析文本结果，显示原始文本');
+                    // 显示原始文本结果
+                    html += `
+                        <div style="margin-bottom: 16px;">
+                            <h4 style="color: var(--text-secondary);">查询结果:</h4>
+                        </div>
+                        <pre style="background: #f8f9fa; padding: 16px; border-radius: 8px; overflow-x: auto; white-space: pre-wrap;">${escapeHtml(data.result)}</pre>
+                    `;
+                }
+            }
+            
+            resultsContent.innerHTML = html;
+            resultsSection.classList.remove('hidden');
+            
+            // 滚动到结果区域
+            resultsSection.scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        // 解析文本格式的查询结果
+        function parseTextResult(textResult) {
+            try {
+                console.log('开始解析文本结果...');
+                const lines = textResult.split('\n');
+                let headerLine = null;
+                let dataLines = [];
+                let foundTable = false;
+                
+                // 查找表格结构
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    
+                    // 寻找表格头部（包含 |====| 的行）
+                    if (line.includes('====') && line.includes('|')) {
+                        foundTable = true;
+                        // 前一行应该是列名
+                        if (i > 0) {
+                            headerLine = lines[i - 1];
+                        }
+                        // 后续行是数据
+                        for (let j = i + 1; j < lines.length; j++) {
+                            const dataLine = lines[j].trim();
+                            if (dataLine.startsWith('|') && dataLine.endsWith('|') && !dataLine.includes('====')) {
+                                dataLines.push(dataLine);
+                            } else if (dataLine === '' || !dataLine.startsWith('|')) {
+                                break; // 表格结束
+                            }
+                        }
+                        break;
+                    }
+                }
+                
+                if (!foundTable || !headerLine || dataLines.length === 0) {
+                    console.log('未找到有效的表格结构');
+                    return null;
+                }
+                
+                // 解析列名
+                const columns = headerLine.split('|')
+                    .map(col => col.trim())
+                    .filter(col => col !== '');
+                
+                // 解析数据行
+                const rows = dataLines.map(line => {
+                    return line.split('|')
+                        .map(cell => cell.trim())
+                        .filter((cell, index) => index > 0 && index <= columns.length) // 过滤掉首尾空元素
+                        .slice(0, columns.length); // 确保列数匹配
+                });
+                
+                console.log('解析结果 - 列:', columns, '行数:', rows.length);
+                return { columns, rows };
+                
+            } catch (error) {
+                console.error('解析文本结果失败:', error);
+                return null;
+            }
+        }
+
+        // 显示错误信息
+        function showError(message) {
+            const resultsSection = document.getElementById('results-section');
+            const resultsContent = document.getElementById('results-content');
+            
+            let enhancedMessage = message;
+            let troubleshootingTips = '';
+            
+            // 检查是否是Gemini相关错误，提供更友好的提示
+            if (message.includes('failed to connect') || message.includes('UNAVAILABLE') || message.includes('socket is null')) {
+                troubleshootingTips = `
+                    <div style="margin-top: 16px; padding: 12px; background: #e3f2fd; border-left: 4px solid #2196f3; border-radius: 4px;">
+                        <strong>💡 网络连接问题解决方案:</strong><br/>
+                        • 检查网络代理或防火墙设置<br/>
+                        • 暂时关闭VPN后重试<br/>
+                        • 尝试使用手机热点<br/>
+                        • 运行诊断: <code>python gemini_network_test.py</code><br/>
+                        • 或切换到其他后端: <button onclick="switchToQwen()" style="margin-left: 8px; padding: 4px 8px; border: 1px solid #666; border-radius: 4px; background: white; cursor: pointer;">使用通义千问</button>
+                    </div>
+                `;
+            } else if (message.includes('PERMISSION_DENIED') || message.includes('INVALID_ARGUMENT') || message.includes('API key')) {
+                troubleshootingTips = `
+                    <div style="margin-top: 16px; padding: 12px; background: #fff3e0; border-left: 4px solid #ff9800; border-radius: 4px;">
+                        <strong>💡 API Key问题解决方案:</strong><br/>
+                        • 检查API Key格式是否正确（AIza开头）<br/>
+                        • 确认账户余额是否充足<br/>
+                        • <a href="https://makersuite.google.com/app/apikey" target="_blank" style="color: #1976d2;">重新生成API Key</a><br/>
+                        • 或切换到其他后端: <button onclick="switchToQwen()" style="margin-left: 8px; padding: 4px 8px; border: 1px solid #666; border-radius: 4px; background: white; cursor: pointer;">使用通义千问</button>
+                    </div>
+                `;
+            } else if (message.includes('初始化失败') && message.includes('gemini')) {
+                troubleshootingTips = `
+                    <div style="margin-top: 16px; padding: 12px; background: #f3e5f5; border-left: 4px solid #9c27b0; border-radius: 4px;">
+                        <strong>💡 Gemini初始化失败解决方案:</strong><br/>
+                        • 检查网络连接和API Key设置<br/>
+                        • 运行诊断工具: <code>python gemini_network_test.py</code><br/>
+                        • 查看详细故障排除指南: <code>GEMINI_TROUBLESHOOTING.md</code><br/>
+                        • 临时使用其他后端: <button onclick="switchToQwen()" style="margin-left: 8px; padding: 4px 8px; border: 1px solid #666; border-radius: 4px; background: white; cursor: pointer;">切换到通义千问</button>
+                    </div>
+                `;
+            }
+            
+            resultsContent.innerHTML = `
+                <div class="error-message">
+                    <i class="fas fa-exclamation-triangle" style="margin-right: 8px;"></i>
+                    ${escapeHtml(enhancedMessage)}
+                    ${troubleshootingTips}
+                </div>
+            `;
+            
+            resultsSection.classList.remove('hidden');
+            resultsSection.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // 设置查询内容
+        function setQuery(query) {
+            document.getElementById('query-input').value = query;
+        }
+
+                // Navicat 风格的数据库结构展示
+        async function showSchema() {
+            try {
+                showModal('schema-modal');
+                const schemaContent = document.getElementById('schema-content');
+                schemaContent.innerHTML = '<div style="padding: 40px; text-align: center; color: #666;"><i class="fas fa-spinner fa-spin" style="font-size: 24px; margin-bottom: 16px;"></i><br/>正在加载数据库结构...</div>';
+                
+                const response = await fetch('/api/tables');
+                const data = await response.json();
+                
+                if (data.success) {
+                    renderNavicatUI(data.tables);
+                } else {
+                    schemaContent.innerHTML = `<div style="padding: 40px; text-align: center; color: #d32f2f;"><i class="fas fa-exclamation-triangle" style="font-size: 32px; margin-bottom: 16px;"></i><br/>${data.error}</div>`;
+                }
+            } catch (error) {
+                document.getElementById('schema-content').innerHTML = `<div style="padding: 40px; text-align: center; color: #d32f2f;"><i class="fas fa-exclamation-triangle" style="font-size: 32px; margin-bottom: 16px;"></i><br/>获取数据库结构失败: ${error.message}</div>`;
+            }
+        }
+
+        // 渲染 Navicat 风格的界面
+        function renderNavicatUI(tables) {
+            const schemaContent = document.getElementById('schema-content');
+            
+            if (tables.length === 0) {
+                schemaContent.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-database"></i>
+                        <h3>暂无数据表</h3>
+                        <p>数据库中没有发现任何表</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            // 创建 Navicat 风格的布局
+            schemaContent.innerHTML = `
+                <div class="db-navigator">
+                    <div class="nav-header">
+                        <i class="fas fa-database"></i>
+                        <span>数据库结构</span>
+                        <div style="margin-left: auto; font-size: 11px; opacity: 0.8;">${tables.length} 张表</div>
+                    </div>
+                    <div class="nav-content" id="nav-content">
+                        ${renderDatabaseTree(tables)}
+                    </div>
+                </div>
+                <div class="db-details">
+                    <div class="details-header">
+                        <div class="details-title">
+                            <i class="fas fa-info-circle"></i>
+                            <span>表详情</span>
+                        </div>
+                        <div class="details-actions">
+                            <button class="toolbar-btn" onclick="refreshSchema()">
+                                <i class="fas fa-sync-alt"></i>
+                                刷新
+                            </button>
+                        </div>
+                    </div>
+                    <div class="details-content" id="details-content">
+                        <div class="empty-state">
+                            <i class="fas fa-mouse-pointer"></i>
+                            <h3>选择一个表</h3>
+                            <p>点击左侧的表名来查看详细信息</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 渲染数据库树形结构
+        function renderDatabaseTree(tables) {
+            let html = `
+                <div class="db-tree-item selected" onclick="selectDatabase()">
+                    <div class="tree-icon database">
+                        <i class="fas fa-database"></i>
+                    </div>
+                    <div class="tree-label">数据库</div>
+                    <div class="tree-meta">${tables.length}</div>
+                </div>
+                <div class="tree-children">
+            `;
+            
+            tables.forEach(table => {
+                html += `
+                    <div class="db-tree-item" onclick="selectTable('${table.name}')">
+                        <div class="tree-icon table">
+                            <i class="fas fa-table"></i>
+                        </div>
+                        <div class="tree-label">${table.name}</div>
+                        <div class="tree-meta">${table.rows || 0}</div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            return html;
+        }
+
+        // 选择数据库
+        function selectDatabase() {
+            // 更新选中状态
+            document.querySelectorAll('.db-tree-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            document.querySelector('.db-tree-item').classList.add('selected');
+            
+            // 显示数据库概览
+            showDatabaseOverview();
+        }
+
+        // 选择表
+        async function selectTable(tableName) {
+            // 更新选中状态
+            document.querySelectorAll('.db-tree-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            event.target.closest('.db-tree-item').classList.add('selected');
+            
+            // 显示表详情
+            await showTableDetails(tableName);
+        }
+
+        // 显示数据库概览
+        function showDatabaseOverview() {
+            const detailsContent = document.getElementById('details-content');
+            const tables = document.querySelectorAll('.tree-children .db-tree-item');
+            
+            detailsContent.innerHTML = `
+                <div class="table-info-card">
+                    <div class="card-header">
+                        <i class="fas fa-chart-bar"></i>
+                        数据库统计
+                    </div>
+                    <div class="card-content">
+                        <div class="table-wrapper">
+                            <table class="modern-table">
+                                <tbody>
+                                    <tr>
+                                        <td style="font-weight: 600;">表总数</td>
+                                        <td>${tables.length}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="font-weight: 600;">数据库引擎</td>
+                                        <td>SQLite</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="font-weight: 600;">字符集</td>
+                                        <td>UTF-8</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="table-info-card">
+                    <div class="card-header">
+                        <i class="fas fa-list"></i>
+                        表列表
+                    </div>
+                    <div class="card-content">
+                        <div class="table-wrapper">
+                            <table class="modern-table">
+                                <thead>
+                                    <tr>
+                                        <th>表名</th>
+                                        <th>记录数</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${Array.from(tables).map(table => {
+                                        const tableName = table.querySelector('.tree-label').textContent;
+                                        const rowCount = table.querySelector('.tree-meta').textContent;
+                                        return `
+                                            <tr>
+                                                <td>
+                                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                                        <div class="tree-icon table" style="width: 16px; height: 16px; font-size: 10px;">
+                                                            <i class="fas fa-table"></i>
+                                                        </div>
+                                                        ${tableName}
+                                                    </div>
+                                                </td>
+                                                <td>${rowCount}</td>
+                                                <td>
+                                                    <button class="toolbar-btn" onclick="selectTable('${tableName}')" style="padding: 4px 8px; font-size: 11px;">
+                                                        查看详情
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        `;
+                                    }).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 显示表详情
+        async function showTableDetails(tableName) {
+            const detailsContent = document.getElementById('details-content');
+            
+            // 显示加载状态
+            detailsContent.innerHTML = `
+                <div style="padding: 40px; text-align: center; color: #666;">
+                    <i class="fas fa-spinner fa-spin" style="font-size: 24px; margin-bottom: 16px;"></i><br/>
+                    正在加载表 ${tableName} 的详细信息...
+                </div>
+            `;
+            
+            try {
+                // 并行加载表字段和数据
+                const [columnsResponse, dataResponse] = await Promise.all([
+                    fetch(`/api/table/${tableName}/columns`),
+                    fetch(`/api/table/${tableName}/data?limit=10`)
+                ]);
+                
+                const columnsData = await columnsResponse.json();
+                const tableData = await dataResponse.json();
+                
+                if (columnsData.success) {
+                    renderTableDetails(tableName, columnsData.columns, tableData);
+                } else {
+                    detailsContent.innerHTML = `
+                        <div style="padding: 40px; text-align: center; color: #d32f2f;">
+                            <i class="fas fa-exclamation-triangle" style="font-size: 32px; margin-bottom: 16px;"></i><br/>
+                            ${columnsData.error || '加载表信息失败'}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                detailsContent.innerHTML = `
+                    <div style="padding: 40px; text-align: center; color: #d32f2f;">
+                        <i class="fas fa-exclamation-triangle" style="font-size: 32px; margin-bottom: 16px;"></i><br/>
+                        加载失败: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        // 渲染表详细信息（标签页版本）
+        function renderTableDetails(tableName, columns, tableData) {
+            const detailsContent = document.getElementById('details-content');
+            
+            // 生成表结构HTML
+            const structureHtml = `
+                <div class="table-info-card">
+                    <div class="card-header">
+                        <i class="fas fa-columns"></i>
+                        表结构
+                    </div>
+                    <div class="card-content">
+                        <div class="table-wrapper">
+                            <table class="modern-table">
+                                <thead>
+                                    <tr>
+                                        <th>字段名</th>
+                                        <th>数据类型</th>
+                                        <th>键类型</th>
+                                        <th>允许NULL</th>
+                                        <th>默认值</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${columns.map(column => {
+                                        const typeClass = getTypeClass(column.type);
+                                        const keyBadge = getKeyBadge(column.key);
+                                        
+                                        return `
+                                            <tr>
+                                                <td>
+                                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                                        <div class="tree-icon ${column.key === 'PRI' ? 'primary-key' : 'column'}" style="width: 16px; height: 16px; font-size: 10px;">
+                                                            <i class="fas ${column.key === 'PRI' ? 'fa-key' : 'fa-minus'}"></i>
+                                                        </div>
+                                                        <span style="font-family: 'Monaco', 'Menlo', 'Consolas', monospace; font-weight: 500;">${column.name || column.field}</span>
+                                                    </div>
+                                                </td>
+                                                <td><span class="type-badge ${typeClass}">${column.type}</span></td>
+                                                <td>${keyBadge}</td>
+                                                <td>${column.null === 'YES' ? '✓' : '✗'}</td>
+                                                <td>${column.default || '-'}</td>
+                                            </tr>
+                                        `;
+                                    }).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // 生成数据预览HTML
+            let dataHtml = '';
+            if (tableData.success && tableData.columns && tableData.rows) {
+                dataHtml = `
+                    <div class="table-info-card">
+                        <div class="card-header">
+                            <i class="fas fa-table"></i>
+                            表数据 (前 ${tableData.rows.length} 行)
+                        </div>
+                        <div class="card-content">
+                            ${tableData.rows.length > 0 ? `
+                                <div class="table-wrapper">
+                                    <table class="modern-table">
+                                        <thead>
+                                            <tr>
+                                                ${tableData.columns.map(col => `<th>${col}</th>`).join('')}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${tableData.rows.map(row => `
+                                                <tr>
+                                                    ${row.map(cell => {
+                                                        const cellValue = cell === null ? '<em style="color: #94a3b8;">NULL</em>' : 
+                                                                        cell === '' ? '<em style="color: #94a3b8;">(空)</em>' : 
+                                                                        String(cell);
+                                                        const displayValue = String(cellValue).length > 50 ? 
+                                                                            String(cellValue).substring(0, 50) + '...' : cellValue;
+                                                        return `<td title="${cell || ''}">${displayValue}</td>`;
+                                                    }).join('')}
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            ` : `
+                                <div class="empty-state" style="padding: 40px;">
+                                    <i class="fas fa-inbox"></i>
+                                    <h3>暂无数据</h3>
+                                    <p>该表中没有任何记录</p>
+                                </div>
+                            `}
+                        </div>
+                    </div>
+                `;
+            } else {
+                dataHtml = `
+                    <div class="empty-state" style="padding: 40px;">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <h3>数据加载失败</h3>
+                        <p>无法获取表数据</p>
+                    </div>
+                `;
+            }
+            
+            // 创建标签页界面
+            detailsContent.innerHTML = `
+                <div class="details-tabs">
+                    <button class="tab-btn active" onclick="switchTab('data')">
+                        <i class="fas fa-table"></i> 表数据
+                    </button>
+                    <button class="tab-btn" onclick="switchTab('structure')">
+                        <i class="fas fa-columns"></i> 表结构
+                    </button>
+                </div>
+                <div class="tab-content active" id="tab-data">
+                    ${dataHtml}
+                </div>
+                <div class="tab-content" id="tab-structure">
+                    ${structureHtml}
+                </div>
+            `;
+        }
+
+        // 结果显示标签页切换函数
+        function switchTab(tabType) {
+            try {
+                // 更新标签按钮状态
+                document.querySelectorAll('.tab-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                
+                // 找到被点击的按钮并激活
+                const clickedBtn = event && event.target ? event.target.closest('.tab-btn') : null;
+                if (clickedBtn) {
+                    clickedBtn.classList.add('active');
+                }
+                
+                // 更新内容显示
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.remove('active');
+                });
+                
+                const targetContent = document.getElementById(`tab-${tabType}`);
+                if (targetContent) {
+                    targetContent.classList.add('active');
+                }
+            } catch (error) {
+                console.error('结果标签页切换失败:', error);
+            }
+        }
+
+        // 获取数据类型对应的样式类
+        function getTypeClass(type) {
+            const lowerType = type.toLowerCase();
+            if (lowerType.includes('int') || lowerType.includes('float') || lowerType.includes('double') || lowerType.includes('decimal')) {
+                return 'number';
+            } else if (lowerType.includes('date') || lowerType.includes('time')) {
+                return 'date';
+            } else {
+                return 'string';
+            }
+        }
+
+        // 获取键类型标签
+        function getKeyBadge(key) {
+            if (key === 'PRI') {
+                return '<span class="key-badge primary"><i class="fas fa-key"></i> 主键</span>';
+            } else if (key === 'MUL') {
+                return '<span class="key-badge index"><i class="fas fa-search"></i> 索引</span>';
+            } else {
+                return '-';
+            }
+        }
+
+        // 刷新数据库结构
+        async function refreshSchema() {
+            await showSchema();
+        }
+
+        // 显示模型信息
+        async function showModels() {
+            console.log('=== showModels函数开始执行 ===');
+            
+            try {
+                // 显示模态框和加载状态
+                showModal('models-modal');
+                document.getElementById('models-content').innerHTML = '加载中...';
+                console.log('模态框已打开，开始获取模型数据...');
+                
+                const response = await fetch('/api/models');
+                console.log('API响应状态:', response.status, response.statusText);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                console.log('API返回的完整数据:', JSON.stringify(data, null, 2));
+                
+                if (data.success && data.models && Array.isArray(data.models)) {
+                    let html = `
+                        <div style="margin-bottom: 20px; padding: 16px; background: #f8f9fa; border-radius: 8px;">
+                            <strong>后端类型:</strong> ${data.backend || '未知'}<br/>
+                            <strong>当前模型:</strong> ${data.current || '未知'}<br/>
+                            <strong>模型总数:</strong> ${data.models.length}
+                        </div>
+                        <h4 style="margin-bottom: 12px;">可用模型列表:</h4>
+                        <div style="max-height: 300px; overflow-y: auto;">
+                    `;
+                    
+                    data.models.forEach((model, index) => {
+                        const isCurrent = model === data.current;
+                        html += `
+                            <div style="
+                                padding: 12px; 
+                                margin: 4px 0; 
+                                border: 1px solid #e0e0e0; 
+                                border-radius: 6px;
+                                background: ${isCurrent ? '#e3f2fd' : '#ffffff'};
+                                ${isCurrent ? 'border-color: #2196f3; font-weight: 600;' : ''}
+                            ">
+                                ${model} ${isCurrent ? '<span style="color: #2196f3;">(当前使用)</span>' : ''}
+                            </div>
+                        `;
+                    });
+                    
+                    html += '</div>';
+                    
+                    console.log('准备设置HTML内容...');
+                    document.getElementById('models-content').innerHTML = html;
+                    console.log('HTML内容已设置完成');
+                    
+                } else {
+                    console.error('数据格式不正确:', data);
+                    document.getElementById('models-content').innerHTML = `
+                        <div style="color: red; padding: 16px; background: #ffebee; border-radius: 8px;">
+                            <h4>❌ 获取模型信息失败</h4>
+                            <p><strong>原因:</strong> ${data.error || '数据格式不正确'}</p>
+                            <details style="margin-top: 10px;">
+                                <summary>调试信息</summary>
+                                <pre style="background: #f5f5f5; padding: 10px; margin-top: 10px; overflow: auto;">
+${JSON.stringify(data, null, 2)}
+                                </pre>
+                            </details>
+                        </div>
+                    `;
+                }
+                
+            } catch (error) {
+                console.error('showModels函数执行失败:', error);
+                document.getElementById('models-content').innerHTML = `
+                    <div style="color: red; padding: 16px; background: #ffebee; border-radius: 8px;">
+                        <h4>❌ 连接失败</h4>
+                        <p><strong>错误:</strong> ${error.message}</p>
+                        <p><strong>建议:</strong> 请检查服务器是否正常运行</p>
+                    </div>
+                `;
+            }
+            
+            console.log('=== showModels函数执行完成 ===');
+        }
+
+        // 重新初始化
+        async function reinitialize() {
+            try {
+                const response = await fetch('/api/initialize', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        backend: 'ollama',
+                        model: 'qwen2'
+                    }),
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    checkStatus();
+                    showSuccess('系统重新初始化成功');
+                } else {
+                    showError(data.message);
+                }
+            } catch (error) {
+                showError('重新初始化失败');
+            }
+        }
+
+        // 显示成功信息
+        function showSuccess(message) {
+            const resultsSection = document.getElementById('results-section');
+            const resultsContent = document.getElementById('results-content');
+            
+            resultsContent.innerHTML = `
+                <div class="success-message">
+                    <i class="fas fa-check-circle" style="margin-right: 8px;"></i>
+                    ${escapeHtml(message)}
+                </div>
+            `;
+            
+            resultsSection.classList.remove('hidden');
+        }
+
+        // 显示模态框
+        function showModal(modalId) {
+            document.getElementById(modalId).classList.remove('hidden');
+        }
+
+        // 关闭模态框
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.add('hidden');
+        }
+
+        // 转义HTML
+        function escapeHtml(unsafe) {
+            return unsafe
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        // 快速切换到通义千问
+        async function switchToQwen() {
+            console.log('切换到通义千问...');
+            
+            // 更新配置UI
+            document.getElementById('backend-select').value = 'qwen_api';
+            document.getElementById('model-select').value = 'qwen-plus';
+            updateModelOptions(); // 更新模型列表
+            
+            // 显示API Key输入框
+            updateApiKeyVisibility();
+            
+            // 提示用户
+            showSuccess('已切换到通义千问后端，请设置API Key后重新初始化');
+            
+            // 滚动到配置区域
+            document.getElementById('config-section').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // 回车键执行查询
+        document.getElementById('query-input').addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 'Enter') {
+                executeQuery();
+            }
+        });
+
+        // 点击模态框背景关闭
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('modal')) {
+                e.target.classList.add('hidden');
+            }
+        });
+
+        // ========== 表选择器功能（模态框版本） ==========
+        let selectedTables = new Set(); // 使用Set存储选中的表
+        let allTablesData = []; // 存储所有表的数据
+
+        // 显示表结构模态框
+        async function showTablesModal() {
+            console.log('显示表结构模态框...');
+            
+            // 显示模态框
+            showModal('tables-modal');
+            
+            // 加载表结构数据
+            try {
+                document.getElementById('tables-content').innerHTML = `
+                    <div style="text-align: center; padding: 40px;">
+                        <i class="fas fa-spinner fa-spin" style="font-size: 32px; color: var(--primary-color);"></i>
+                        <p style="margin-top: 16px; color: #666;">正在加载表结构...</p>
+                    </div>
+                `;
+                
+                const response = await fetch('/api/tables');
+                const data = await response.json();
+                
+                if (data.success && data.tables) {
+                    renderTablesModal(data.tables);
+                } else {
+                    document.getElementById('tables-content').innerHTML = `
+                        <div style="color: red; text-align: center; padding: 40px;">
+                            <i class="fas fa-exclamation-triangle" style="font-size: 48px; margin-bottom: 16px;"></i>
+                            <p>获取表结构失败: ${data.error || '未知错误'}</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('获取表结构失败:', error);
+                document.getElementById('tables-content').innerHTML = `
+                    <div style="color: red; text-align: center; padding: 40px;">
+                        <i class="fas fa-exclamation-triangle" style="font-size: 48px; margin-bottom: 16px;"></i>
+                        <p>连接失败: ${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        // 渲染表结构到模态框（带选择功能）
+        function renderTablesModal(tables) {
+            if (!tables || tables.length === 0) {
+                document.getElementById('tables-content').innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: #666;">
+                        <i class="fas fa-database" style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;"></i>
+                        <p>未找到任何表</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // 保存表数据
+            allTablesData = tables;
+
+            let html = `
+                <div style="margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <div style="color: #666;">
+                            共找到 <strong style="color: var(--primary-color);">${tables.length}</strong> 个表
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="button secondary" onclick="selectAllTablesModal()" style="font-size: 12px; padding: 6px 12px;">
+                                <i class="fas fa-check-double"></i> 全选
+                            </button>
+                            <button class="button secondary" onclick="clearAllTablesModal()" style="font-size: 12px; padding: 6px 12px;">
+                                <i class="fas fa-times"></i> 清空
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="selected-tables-info-modal" style="font-size: 14px; color: #666; margin-bottom: 16px; padding: 8px 12px; background: #f8f9fa; border-radius: 6px;">
+                        已选择 <span id="selected-count-modal">${selectedTables.size}</span> 个表
+                        <span style="color: #999; font-size: 12px; margin-left: 8px;">
+                            (${selectedTables.size > 0 ? '将只在这些表中查询' : '未选择时使用所有表'})
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="tables-grid" style="max-height: 400px; overflow-y: auto;">
+            `;
+
+            tables.forEach(table => {
+                const isSelected = selectedTables.has(table.name);
+                const columnsPreview = table.columns.slice(0, 5).join(', ') + (table.column_count > 5 ? ` ... (+${table.column_count - 5}个)` : '');
+                
+                html += `
+                    <div class="table-item ${isSelected ? 'selected' : ''}" onclick="toggleTableModal('${table.name}')" 
+                         style="margin-bottom: 12px; border: 2px solid ${isSelected ? 'var(--primary-color)' : '#e5e7eb'}; 
+                                border-radius: 8px; overflow: hidden; cursor: pointer; transition: all 0.2s ease;
+                                background: ${isSelected ? 'rgba(52, 152, 219, 0.05)' : 'white'};">
+                        <div style="padding: 12px; border-bottom: 1px solid #e5e7eb; background: ${isSelected ? '#f0f8ff' : '#f8fafc'};">
+                            <div style="display: flex; align-items: center;">
+                                <input type="checkbox" ${isSelected ? 'checked' : ''} 
+                                       onchange="event.stopPropagation(); toggleTableModal('${table.name}')"
+                                       style="margin-right: 12px; transform: scale(1.2);">
+                                <h4 style="margin: 0; color: #1e293b; display: flex; align-items: center; flex: 1;">
+                                    <i class="fas fa-table" style="margin-right: 8px; color: var(--primary-color);"></i>
+                                    ${table.name}
+                                    <span style="margin-left: auto; font-size: 12px; color: #64748b; font-weight: normal;">
+                                        ${table.column_count} 个字段
+                                    </span>
+                                </h4>
+                            </div>
+                        </div>
+                        <div style="padding: 12px;">
+                            <div style="font-size: 12px; color: #666; margin-bottom: 8px;">
+                                <i class="fas fa-list" style="margin-right: 4px;"></i>
+                                字段预览: ${columnsPreview}
+                            </div>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px; max-height: 120px; overflow-y: auto;">
+                `;
+                
+                table.columns.forEach(column => {
+                    html += `
+                        <div style="background: #f1f5f9; padding: 6px 8px; border-radius: 4px; font-size: 11px;">
+                            <strong style="color: #334155;">${column}</strong>
+                        </div>
+                    `;
+                });
+                
+                html += `
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += '</div>';
+            document.getElementById('tables-content').innerHTML = html;
+        }
+
+        // 模态框中的表选择操作
+        function toggleTableModal(tableName) {
+            if (selectedTables.has(tableName)) {
+                selectedTables.delete(tableName);
+            } else {
+                selectedTables.add(tableName);
+            }
+            renderTablesModal(allTablesData); // 重新渲染
+            updateTablesButton(); // 更新按钮显示
+        }
+
+        function selectAllTablesModal() {
+            selectedTables.clear();
+            allTablesData.forEach(table => {
+                selectedTables.add(table.name);
+            });
+            renderTablesModal(allTablesData);
+            updateTablesButton(); // 更新按钮显示
+        }
+
+        function clearAllTablesModal() {
+            selectedTables.clear();
+            renderTablesModal(allTablesData);
+            updateTablesButton(); // 更新按钮显示
+        }
+
+        // 获取选中的表列表（供查询时使用）
+        function getSelectedTables() {
+            return selectedTables.size > 0 ? Array.from(selectedTables) : null;
+        }
+
+        // 更新表选择按钮显示
+        function updateTablesButton() {
+            const btn = document.getElementById('tables-btn');
+            const text = document.getElementById('tables-btn-text');
+            const count = document.getElementById('tables-count');
+            
+            if (selectedTables.size > 0) {
+                text.textContent = '已选表结构';
+                count.textContent = selectedTables.size;
+                count.style.display = 'inline';
+                btn.style.borderColor = 'var(--primary-color)';
+                btn.style.background = 'rgba(52, 152, 219, 0.1)';
+            } else {
+                text.textContent = '选择表结构';
+                count.style.display = 'none';
+                btn.style.borderColor = '';
+                btn.style.background = '';
+            }
+        }
+
+        // 从config.ini加载API Key到前端配置区域
+        async function loadApiKeyFromConfig() {
+            try {
+                const response = await fetch('/api/get-model-config');
+                const data = await response.json();
+                
+                if (data.success && data.config) {
+                    const apiKeyInput = document.getElementById('api-key-input');
+                    if (apiKeyInput && data.config.api_key) {
+                        apiKeyInput.value = data.config.api_key;
+                        console.log('✅ API Key已从config.ini加载到前端');
+                    }
+                    
+                    // 同时更新API Key显示状态
+                    updateApiKeyVisibility();
+                }
+            } catch (error) {
+                console.error('加载API Key配置失败:', error);
+            }
+        }
+
+    </script>
+
+    <!-- 表结构模态框 -->
+    <div id="tables-modal" class="modal hidden">
+        <div class="modal-overlay" onclick="closeModal('tables-modal')"></div>
+        <div class="modal-content" style="max-width: 900px; max-height: 85vh;">
+            <div class="modal-header">
+                <h3><i class="fas fa-table"></i> 选择查询表范围</h3>
+                <button class="modal-close" onclick="closeModal('tables-modal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+                <div id="tables-content">
+                    <div style="text-align: center; padding: 40px;">
+                        <i class="fas fa-spinner fa-spin" style="font-size: 32px; color: var(--primary-color);"></i>
+                        <p style="margin-top: 16px; color: #666;">正在加载表结构...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html> 

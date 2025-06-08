@@ -6,6 +6,7 @@
 """
 
 import json
+import re
 
 class MockDatabaseConnector:
     """模拟数据库连接器"""
@@ -140,7 +141,7 @@ JOIN `orders` o ON u.`id` = o.`user_id`'''
         return True, "SELECT * FROM `users`"
 
 class SQLSecurityChecker:
-    """SQL安全检查器"""
+    """SQL安全检查器（复用之前的代码）"""
     
     DANGEROUS_KEYWORDS = {
         'INSERT', 'UPDATE', 'DELETE', 'DROP', 'CREATE', 'ALTER', 

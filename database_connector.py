@@ -92,9 +92,23 @@ class DatabaseConnector:
             
         return schema
     
-    def get_schema_description(self):
-        """获取数据库结构的文本描述，用于提供给大模型"""
-        schema = self.get_database_schema()
+    def get_schema_description(self, selected_tables=None):
+        """
+        获取数据库结构的文本描述，用于提供给大模型
+        
+        Args:
+            selected_tables: 可选，指定要包含的表列表。如果为None，返回所有表
+        """
+        if selected_tables:
+            # 只获取指定表的结构
+            schema = {}
+            for table in selected_tables:
+                if table in self.get_all_tables():  # 验证表是否存在
+                    schema[table] = self.get_table_columns(table)
+        else:
+            # 获取所有表的结构
+            schema = self.get_database_schema()
+        
         description = "数据库表结构信息：\n\n"
         
         for table_name, columns in schema.items():
@@ -105,6 +119,21 @@ class DatabaseConnector:
             description += "\n"
             
         return description
+    
+    def get_tables_info(self):
+        """获取所有表的基本信息，用于前端表选择"""
+        tables = self.get_all_tables()
+        tables_info = []
+        
+        for table in tables:
+            columns = self.get_table_columns(table)
+            tables_info.append({
+                'name': table,
+                'column_count': len(columns),
+                'columns': [col['field'] for col in columns[:5]]  # 只返回前5个字段作为预览
+            })
+        
+        return tables_info
     
     def execute_query(self, sql):
         """执行SQL查询并返回结果"""

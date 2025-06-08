@@ -1,0 +1,100 @@
+项目规划：本地自然语言转SQL查询工具
+通义千问 API 接入
+接入方式：阿里云百炼平台支持兼容 OpenAI 接口或 DashScope SDK 两种方式调用
+help.aliyun.com
+blog.csdn.net
+。例如可用 OpenAI Python SDK：
+python
+复制
+编辑
+from openai import OpenAI
+client = OpenAI(api_key=os.getenv("DASHSCOPE_API_KEY"),
+                base_url="https://dashscope.aliyuncs.com/compatible-mode/v1")
+completion = client.chat.completions.create(
+    model="qwen-plus",
+    messages=[{"role":"user","content":"查询今天的天气"}]
+)
+也可以安装官方 DashScope SDK（pip install dashscope），使用 dashscope.Generation.call("qwen-模型名", messages=...) 调用模型
+blog.csdn.net
+。
+调用示例：以上代码演示了对话式调用大模型的示例，发送 messages 列表获得模型回复
+help.aliyun.com
+blog.csdn.net
+。根据需求可将 prompt 换成“将自然语言转为 SQL”之类的指令，并传入表结构信息以提示模型。
+鉴权方式：通义千问调用需要阿里云百炼平台的 API Key 认证。建议将 API Key 存入环境变量（例如 export DASHSCOPE_API_KEY="你的API-KEY"）
+help.aliyun.com
+。在 Python 中可通过 os.getenv("DASHSCOPE_API_KEY") 获取并传入 api_key 参数
+help.aliyun.com
+。
+开发规划：MVP 阶段划分
+表结构读取模块
+功能：从配置文件读取 MySQL 连接信息（主机、端口、用户、密码、数据库名等），连接数据库后获取所有表名和字段信息。常用做法是先执行 SHOW TABLES; 获得表列表，再对每个表执行 SHOW COLUMNS FROM 表名; 或查询 information_schema 来获取字段及类型。
+建议工具：使用官方 mysql-connector-python（或 PyMySQL）来连接 MySQL
+blog.csdn.net
+cloud.tencent.com
+。如：
+python
+复制
+编辑
+import mysql.connector
+conn = mysql.connector.connect(host=host, user=user, password=pw, database=db)
+cursor = conn.cursor()
+cursor.execute("SHOW TABLES;")
+tables = [t[0] for t in cursor.fetchall()]
+SQLAlchemy 也可用于反射数据库结构。配置解析可用内置的 configparser（.ini 格式）或 PyYAML（.yaml），也可用 python-dotenv 加载 .env。
+示例引用：mysql.connector.connect 用于连接数据库
+blog.csdn.net
+；使用 PyMySQL 的例子中，通过 conn.select_db(...) 切换数据库后执行 SHOW TABLES
+cloud.tencent.com
+。
+大模型 SQL 生成模块
+功能：将用户输入的自然语言查询请求与数据库表结构上下文一起发送给通义千问模型，生成对应的 SQL 语句。为提高准确度，可在 prompt 中附加数据库表和字段说明，让模型了解可用字段。
+建议工具：使用 OpenAI 兼容的 Python SDK 或 DashScope SDK 调用模型
+help.aliyun.com
+blog.csdn.net
+。例如使用 DashScope SDK：
+python
+复制
+编辑
+from dashscope import Generation
+resps = Generation.call("qwen-max", messages=[{"role":"user","content": prompt_text}])
+sql = resps.choices[0]["message"]["content"]
+上述代码会返回模型生成的回答（即 SQL 语句）
+blog.csdn.net
+。模型名称可选 qwen-turbo、qwen-plus、qwen-max 等（参考官方模型列表）。
+库/工具：openai（兼容 SDK）或 dashscope；可结合 LangChain 等框架设计对话式 Prompt，但本项目 MVP 阶段可直接构造文本调用。
+SQL 安全检查模块
+功能：在执行模型生成的 SQL 之前，验证其合法性、只包含允许的操作，并过滤敏感操作。明确要求只允许 SELECT 查询，禁止任何 INSERT/UPDATE/DELETE/DROP 等操作。
+建议工具：可以使用 sqlparse 库解析 SQL 语句结构
+cloud.baidu.com
+，也可用简单的字符串或正则检查。例如：确认生成的 SQL 以 “SELECT” 开头，且不包含 “INSERT”、“UPDATE” 等关键词。若检测到非法操作，可拒绝执行并向用户返回错误。
+安全策略：同时建议在数据库层面使用只读账号连接 MySQL，仅授予 SELECT 权限；这样即使有非法 SQL，也因权限不足而无法执行。
+SQL 执行模块
+功能：对通过安全检查的 SQL 语句进行执行，查询 MySQL 数据库并获取结果集。将查询结果整理后返回给界面模块。
+建议工具：继续使用阶段1连接的 MySQL 库执行查询，如 cursor.execute(sql) 及 cursor.fetchall() 获取结果
+blog.csdn.net
+。可用 pandas.read_sql_query() 将结果读入 DataFrame，或使用 tabulate、rich 库格式化输出表格。示例：
+python
+复制
+编辑
+cursor.execute(generated_sql)
+rows = cursor.fetchall()
+print(tabulate(rows, headers=[col[0] for col in cursor.description]))
+引用示例：mysql-connector-python 中执行查询的示例代码
+blog.csdn.net
+演示了 cursor.execute() 用法。
+用户界面模块
+功能：提供用户输入自然语言查询和展示结果的交互界面。MVP 阶段可采用命令行接口（CLI）方式：提示用户输入查询语句，输出生成的 SQL 和查询结果。后续可选用简易 GUI 进一步优化用户体验。
+建议工具：
+命令行：可直接使用 Python 内置的 input()/print()。为增强交互，也可用 click 或 prompt_toolkit 美化。
+图形界面：可使用内置的 tkinter 库或 PySimpleGUI 等轻量级GUI库，快速搭建输入框和文本框显示结果。
+示例：命令行界面流程可以参考简单的交互脚本，GUI 可设计一个文本框输入、一个按钮执行和下方结果区显示 SQL 及表格内容。
+以上各阶段均可阶段性迭代开发：先实现基础的配置读取和数据库连接；再添加大模型调用；然后加上安全检查和 SQL 执行；最后完善用户界面。每个阶段选用合适的 Python 库可加快开发效率。例如：配置模块可用 configparser、数据库模块用 mysql-connector-python/PyMySQL
+blog.csdn.net
+cloud.tencent.com
+，大模型模块用 openai 或 dashscope
+help.aliyun.com
+blog.csdn.net
+，SQL 安全检查可用 sqlparse
+cloud.baidu.com
+，结果显示可用 tabulate 或 rich 等工具。这样逐步搭建即可得到一个可用的自然语言转 SQL 查询工具。

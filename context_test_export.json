@@ -1,0 +1,71 @@
+{
+  "session_info": {
+    "start_time": "2025-06-08T19:28:46.173986",
+    "export_time": "2025-06-08T19:29:07.272034",
+    "total_entries": 8
+  },
+  "conversation": [
+    {
+      "role": "user",
+      "query": "查询所有用户的用户名和真实姓名",
+      "sql": null,
+      "timestamp": "2025-06-08T19:28:52.811031"
+    },
+    {
+      "role": "assistant",
+      "sql": "SELECT `loginname`, `name` FROM `sys_user`",
+      "success": true,
+      "error": null,
+      "timestamp": "2025-06-08T19:28:53.958437"
+    },
+    {
+      "role": "user",
+      "query": "只要前5条",
+      "sql": null,
+      "timestamp": "2025-06-08T19:28:58.962081"
+    },
+    {
+      "role": "assistant",
+      "sql": "SELECT `loginname`, `name` FROM `sys_user` LIMIT 5",
+      "success": true,
+      "error": null,
+      "timestamp": "2025-06-08T19:29:00.629733"
+    },
+    {
+      "role": "user",
+      "query": "再加上邮箱字段",
+      "sql": null,
+      "timestamp": "2025-06-08T19:29:02.751010"
+    },
+    {
+      "role": "assistant",
+      "sql": "SELECT `loginname`, `name`, `email` FROM `sys_user` LIMIT 5",
+      "success": true,
+      "error": null,
+      "timestamp": "2025-06-08T19:29:04.210961"
+    },
+    {
+      "role": "user",
+      "query": "按创建时间倒序排列",
+      "sql": null,
+      "timestamp": "2025-06-08T19:29:05.357998"
+    },
+    {
+      "role": "assistant",
+      "sql": "SELECT `loginname`, `name`, `email` FROM `sys_user` ORDER BY `hiredate` DESC LIMIT 5",
+      "success": true,
+      "error": null,
+      "timestamp": "2025-06-08T19:29:07.263310"
+    }
+  ],
+  "summary": {
+    "session_start": "2025-06-08T19:28:46.173986",
+    "total_queries": 4,
+    "successful_queries": 4,
+    "recent_queries": [
+      "只要前5条",
+      "再加上邮箱字段",
+      "按创建时间倒序排列"
+    ]
+  }
+}

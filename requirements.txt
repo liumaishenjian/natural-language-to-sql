@@ -1,8 +1,49 @@
-# Database connection
-mysql-connector-python>=8.0.0
+# Web框架
+Flask==2.3.3
+Werkzeug==2.3.7
+flask-cors==4.0.0
+
+# 数据库连接
+mysql-connector-python==8.1.0
+PyMySQL==1.1.0
+
+# HTTP客户端
+requests==2.31.0
+
+# AI模型API
+dashscope>=1.10.0
+openai>=1.0.0
+google-generativeai>=0.3.0
+
+# SQL解析和安全检查
+sqlparse>=0.4.0
+
+# 结果格式化和显示
+tabulate>=0.9.0
+rich>=10.0.0
+
+# 配置文件处理
+configparser==6.0.0
+
+# JSON处理
+json5==0.9.14
+
+# 开发和调试
+python-dotenv==1.0.0
+
+# 可选：如果需要支持其他数据库
+# psycopg2-binary==2.9.7  # PostgreSQL
+# pyodbc==4.0.39          # SQL Server
+
+# 可选：用于更好的日志和调试
+# colorama==0.4.6         # 彩色输出
+# rich==13.5.2            # 美化终端输出
 
 # LLM API
 openai>=1.0.0
+
+# Google Gemini API
+google-generativeai>=0.3.0
 
 # SQL parsing and security check
 sqlparse>=0.4.0
@@ -11,4 +52,7 @@ sqlparse>=0.4.0
 tabulate>=0.9.0
 
 # Optional: better table display
-rich>=10.0.0 
+rich>=10.0.0
+
+# Web server dependencies
+flask-cors>=3.0.0 

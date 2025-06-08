@@ -12,97 +12,165 @@ import time
 class OllamaLLMGenerator:
     """使用本地Ollama大模型生成SQL的类"""
     
-    def __init__(self, model_name="qwen2", base_url="http://localhost:11434"):
+    def __init__(self, model_name="qwen2", api_url="http://localhost:11434"):
         """
         初始化Ollama客户端
         
         Args:
             model_name: 模型名称，如 qwen2, llama3, mistral 等
-            base_url: Ollama API的基础URL
+            api_url: Ollama API的基础URL
         """
         self.model_name = model_name
-        self.base_url = base_url.rstrip('/')
-        self.api_url = f"{self.base_url}/api/generate"
-        self.models_url = f"{self.base_url}/api/tags"
+        self.api_url = f"{api_url}/api/generate"
+        self.available_models = None
         
-    def test_connection(self):
-        """测试Ollama连接和模型可用性"""
-        try:
-            # 检查Ollama服务是否运行
-            response = requests.get(self.models_url, timeout=5)
-            
-            if response.status_code != 200:
-                print(f"❌ Ollama服务连接失败，状态码: {response.status_code}")
-                return False
-            
-            # 检查可用模型
-            models_data = response.json()
-            available_models = [model['name'] for model in models_data.get('models', [])]
-            
-            print(f"✅ Ollama服务连接成功")
-            print(f"📋 可用模型: {', '.join(available_models) if available_models else '无'}")
-            
-            # 检查指定模型是否可用
-            model_available = any(self.model_name in model for model in available_models)
-            
-            if not model_available:
-                print(f"⚠️  模型 '{self.model_name}' 未找到")
-                if available_models:
-                    print(f"💡 建议使用: {available_models[0]}")
-                    # 自动使用第一个可用模型
-                    self.model_name = available_models[0].split(':')[0]
-                    print(f"🔄 自动切换到模型: {self.model_name}")
-                else:
-                    print("❌ 没有可用的模型，请先用 'ollama pull qwen2' 下载模型")
+    def test_connection(self, max_retries=3, retry_delay=2):
+        """测试与Ollama的连接
+        
+        Args:
+            max_retries: 最大重试次数
+            retry_delay: 重试间隔（秒）
+        """
+        for attempt in range(max_retries):
+            try:
+                # 1. 首先检查Ollama服务是否在运行
+                health_check = requests.get(
+                    "http://localhost:11434/",
+                    timeout=5
+                )
+                if health_check.status_code != 200:
+                    print(f"⚠️ Ollama服务未正常运行 (状态码: {health_check.status_code})")
+                    if attempt < max_retries - 1:
+                        print(f"🔄 {attempt + 1}/{max_retries} 次重试中...")
+                        time.sleep(retry_delay)
+                        continue
                     return False
-            else:
+                
+                print("✅ Ollama服务连接成功")
+                
+                # 2. 获取可用模型列表
+                models = self.get_available_models()
+                if not models:
+                    print("⚠️ 无法获取模型列表")
+                    if attempt < max_retries - 1:
+                        print(f"🔄 {attempt + 1}/{max_retries} 次重试中...")
+                        time.sleep(retry_delay)
+                        continue
+                    return False
+                
+                print(f"📋 可用模型: {', '.join(models)}")
+                
+                # 3. 检查指定模型是否可用
+                model_available = False
+                for model in models:
+                    if self.model_name in model:
+                        model_available = True
+                        break
+                
+                if not model_available:
+                    print(f"⚠️ 模型 '{self.model_name}' 未找到")
+                    print(f"💡 可用模型: {', '.join(models)}")
+                    return False
+                
                 print(f"✅ 模型 '{self.model_name}' 可用")
-            
-            # 测试模型响应
-            test_response = self._call_ollama("请回复：连接测试成功")
-            if test_response:
-                print(f"🎯 模型响应测试: {test_response[:50]}...")
-                return True
-            else:
-                print("❌ 模型响应测试失败")
+                
+                # 4. 测试模型响应
+                test_prompt = "请回复：连接测试成功"
+                print(f"📤 [Ollama] 测试提示词: {test_prompt}")
+                
+                test_response = self._call_ollama(
+                    test_prompt,
+                    timeout=10
+                )
+                
+                if test_response and "连接测试成功" in test_response:
+                    print(f"📥 [Ollama] 测试响应: {test_response}")
+                    return True
+                else:
+                    print("⚠️ 模型响应测试失败")
+                    if attempt < max_retries - 1:
+                        print(f"🔄 {attempt + 1}/{max_retries} 次重试中...")
+                        time.sleep(retry_delay)
+                        continue
+                    return False
+                    
+            except requests.exceptions.ConnectionError:
+                print("⚠️ 无法连接到Ollama服务")
+                print("💡 请确保Ollama服务正在运行: ollama serve")
+                if attempt < max_retries - 1:
+                    print(f"🔄 {attempt + 1}/{max_retries} 次重试中...")
+                    time.sleep(retry_delay)
+                    continue
                 return False
                 
-        except requests.exceptions.ConnectionError:
-            print("❌ 无法连接到Ollama服务")
-            print("💡 请确保Ollama正在运行: ollama serve")
-            return False
-        except Exception as e:
-            print(f"❌ Ollama连接测试失败: {e}")
-            return False
-    
-    def _call_ollama(self, prompt, max_tokens=1000):
-        """调用Ollama API"""
-        payload = {
-            "model": self.model_name,
-            "prompt": prompt,
-            "stream": False,
-            "options": {
-                "temperature": 0.1,
-                "num_predict": max_tokens
-            }
-        }
+            except requests.exceptions.Timeout:
+                print("⚠️ 连接超时")
+                if attempt < max_retries - 1:
+                    print(f"🔄 {attempt + 1}/{max_retries} 次重试中...")
+                    time.sleep(retry_delay)
+                    continue
+                return False
+                
+            except Exception as e:
+                print(f"⚠️ 连接测试失败: {str(e)}")
+                if attempt < max_retries - 1:
+                    print(f"🔄 {attempt + 1}/{max_retries} 次重试中...")
+                    time.sleep(retry_delay)
+                    continue
+                return False
         
+        return False
+    
+    def get_available_models(self):
+        """获取可用的模型列表"""
         try:
+            response = requests.get(
+                "http://localhost:11434/api/tags",
+                timeout=5
+            )
+            if response.status_code == 200:
+                models_data = response.json().get('models', [])
+                # 提取模型名称
+                model_names = [model.get('name', '') for model in models_data if model.get('name')]
+                self.available_models = model_names
+                return model_names
+            return []
+        except Exception as e:
+            print(f"⚠️ 获取模型列表失败: {str(e)}")
+            return []
+    
+    def _call_ollama(self, prompt, timeout=30):
+        """调用Ollama API
+        
+        Args:
+            prompt: 提示词
+            timeout: 超时时间（秒）
+        """
+        try:
+            payload = {
+                "model": self.model_name,
+                "prompt": prompt,
+                "stream": False
+            }
+            
             response = requests.post(
-                self.api_url, 
-                json=payload, 
-                timeout=30  # 本地模型可能较慢
+                self.api_url,
+                json=payload,
+                timeout=timeout
             )
             
             if response.status_code == 200:
-                result = response.json()
-                return result.get('response', '').strip()
+                return response.json().get('response', '')
             else:
-                print(f"Ollama API错误: {response.status_code} - {response.text}")
+                print(f"⚠️ API调用失败 (状态码: {response.status_code})")
                 return None
                 
+        except requests.exceptions.Timeout:
+            print(f"⚠️ API调用超时 (>{timeout}秒)")
+            return None
+            
         except Exception as e:
-            print(f"调用Ollama失败: {e}")
+            print(f"⚠️ API调用错误: {str(e)}")
             return None
     
     def create_sql_prompt(self, user_query, schema_description):
@@ -126,25 +194,45 @@ class OllamaLLMGenerator:
         
         return prompt
     
-    def generate_sql(self, user_query, schema_description):
+    def generate_sql(self, user_query, schema_description, conversation_manager=None):
         """
         根据用户查询和数据库结构生成SQL
         
         Args:
             user_query: 用户的自然语言查询
             schema_description: 数据库结构描述
+            conversation_manager: 对话管理器（可选，用于上下文支持）
             
         Returns:
             tuple: (success: bool, sql_or_error: str)
         """
         try:
-            prompt = self.create_sql_prompt(user_query, schema_description)
+            # 判断是否使用上下文模式
+            if conversation_manager:
+                # Ollama使用上下文提示词模式
+                prompt = conversation_manager.get_context_for_prompt(schema_description, user_query)
+                print("📤 [Ollama] 使用上下文对话模式")
+                print("📤 [Ollama] 发送的提示词（含历史上下文）:")
+            else:
+                # 使用传统单次对话模式
+                prompt = self.create_sql_prompt(user_query, schema_description)
+                print("📤 [Ollama] 使用单次对话模式")
+                print("📤 [Ollama] 发送的提示词:")
+            
+            print("-" * 60)
+            print(prompt)
+            print("-" * 60)
             
             print(f"🤖 正在调用本地模型 {self.model_name} 生成SQL...")
             generated_response = self._call_ollama(prompt)
             
             if not generated_response:
                 return False, "ERROR: 本地模型调用失败"
+            
+            print("📥 [Ollama] 完整原始响应:")
+            print("-" * 60)
+            print(generated_response)
+            print("-" * 60)
             
             # 清理响应，提取SQL语句
             generated_sql = self._extract_sql_from_response(generated_response)
@@ -164,29 +252,30 @@ class OllamaLLMGenerator:
     
     def _extract_sql_from_response(self, response):
         """从模型响应中提取SQL语句"""
-        # 移除可能的markdown代码块
-        if "```sql" in response:
+        cleaned_sql = response.strip()
+        
+        # 移除markdown代码块标记
+        if "```sql" in cleaned_sql:
             # 提取SQL代码块
-            parts = response.split("```sql")
+            parts = cleaned_sql.split("```sql")
             if len(parts) > 1:
                 sql_part = parts[1].split("```")[0]
-                return sql_part.strip()
-        elif "```" in response:
+                cleaned_sql = sql_part.strip()
+        elif "```" in cleaned_sql:
             # 提取一般代码块
-            parts = response.split("```")
+            parts = cleaned_sql.split("```")
             if len(parts) >= 3:
                 sql_part = parts[1]
-                return sql_part.strip()
+                cleaned_sql = sql_part.strip()
         
         # 如果没有代码块，尝试查找SELECT语句
-        lines = response.split('\n')
-        for line in lines:
-            line = line.strip()
-            if line.upper().startswith('SELECT'):
-                return line
-        
-        # 如果找不到明确的SQL，返回清理后的整个响应
-        cleaned = response.strip()
+        if not cleaned_sql.upper().startswith('SELECT'):
+            lines = cleaned_sql.split('\n')
+            for line in lines:
+                line = line.strip()
+                if line.upper().startswith('SELECT'):
+                    cleaned_sql = line
+                    break
         
         # 移除常见的前缀词
         prefixes_to_remove = [
@@ -199,21 +288,15 @@ class OllamaLLMGenerator:
         ]
         
         for prefix in prefixes_to_remove:
-            if cleaned.startswith(prefix):
-                cleaned = cleaned[len(prefix):].strip()
+            if cleaned_sql.startswith(prefix):
+                cleaned_sql = cleaned_sql[len(prefix):].strip()
         
-        return cleaned
-    
-    def get_available_models(self):
-        """获取Ollama中可用的模型列表"""
-        try:
-            response = requests.get(self.models_url, timeout=5)
-            if response.status_code == 200:
-                models_data = response.json()
-                return [model['name'] for model in models_data.get('models', [])]
-            return []
-        except:
-            return []
+        # 移除末尾的分号（如果有的话，我们统一处理）
+        if cleaned_sql.endswith(';'):
+            cleaned_sql = cleaned_sql[:-1].strip()
+            
+        print(f"🧹 [Ollama] 清理后的SQL: {cleaned_sql}")
+        return cleaned_sql
 
 def test_ollama_generator():
     """测试Ollama生成器"""

@@ -1,235 +1,280 @@
-# 自然语言转SQL查询工具
+# 🚀 自然语言转SQL查询工具
 
-一个基于通义千问大模型的自然语言转SQL查询工具，让用户可以用中文描述查询需求，自动生成并执行SQL语句。
+一个现代化的Web应用，支持通过自然语言描述来生成SQL查询语句，同时支持直接SQL查询执行。基于AI大模型，提供智能、高效的数据库查询解决方案。
 
-## 功能特性
+![主界面截图](docs/screenshot.png)
 
-- 🤖 **智能SQL生成**: 使用阿里云通义千问大模型，支持复杂的自然语言理解
-- 🛡️ **安全保障**: 多层安全检查，只允许SELECT查询，防止数据泄露和破坏
-- 📊 **多格式输出**: 支持表格、JSON、CSV等多种结果显示格式
-- 🔄 **交互式界面**: 命令行交互模式，支持连续查询
-- 📝 **智能提示**: 自动读取数据库结构，为大模型提供上下文
-- 🌐 **双模式支持**: 支持在线API和本地Ollama大模型
+## ✨ 功能特性
 
-## 项目结构
+### 🧠 智能查询
+- **自然语言转SQL**: 使用自然语言描述查询需求，AI自动生成对应的SQL语句
+- **直接SQL查询**: 支持直接输入和执行SQL语句
+- **上下文对话**: 支持多轮对话，理解前后文语境
+- **安全检查**: 自动进行SQL注入防护和安全性验证
 
-```
-natural-language-to-sql/
-├── main.py                    # 主程序入口
-├── database_connector.py      # 数据库连接模块
-├── llm_sql_generator.py      # 在线API SQL生成模块
-├── ollama_sql_generator.py   # 本地Ollama SQL生成模块
-├── sql_security_checker.py   # SQL安全检查模块
-├── result_formatter.py       # 结果格式化模块
-├── config.ini                # 数据库配置文件
-├── requirements.txt          # 依赖包列表
-├── test_basic.py             # 基础测试文件
-├── demo_test.py              # 演示测试文件
-├── security_test.py          # 安全测试文件
-└── README.md                 # 项目说明文档
-```
+### 🤖 多模型支持
+- **Ollama本地模型**: 支持qwen2、llama2、codellama、mistral等本地模型
+- **通义千问API**: 支持qwen-turbo、qwen-plus、qwen-max等在线模型
+- **Google Gemini**: 支持gemini-1.5-flash、gemini-1.5-pro等模型
+- **模型热切换**: 无需重启即可切换不同的AI模型
 
-## 安装和配置
+### 🗄️ 数据库支持
+- **MySQL**: 完整支持MySQL数据库连接和查询
+- **PostgreSQL**: 支持PostgreSQL数据库（预留接口）
+- **SQLite**: 支持轻量级SQLite数据库（预留接口）
+- **SQL Server**: 支持Microsoft SQL Server（预留接口）
+
+### 🎨 现代化界面
+- **三列布局**: 系统状态、快捷操作、示例查询分列显示
+- **响应式设计**: 自适应不同屏幕尺寸
+- **Apple Design风格**: 现代化的视觉设计
+- **实时状态**: 实时显示系统连接状态和运行情况
+
+### ⚙️ 配置管理
+- **可视化配置**: 通过Web界面配置数据库连接和API密钥
+- **配置持久化**: 所有配置自动保存到`config.ini`文件
+- **表结构选择**: 可选择特定表进行查询，提高AI生成准确度
+- **多格式输出**: 支持表格、JSON、CSV等多种结果格式
+
+## 🛠️ 技术栈
+
+### 后端
+- **Python 3.8+**: 核心开发语言
+- **Flask**: Web框架
+- **MySQL Connector**: 数据库连接驱动
+- **Requests**: HTTP客户端库
+- **ConfigParser**: 配置文件管理
+
+### 前端
+- **HTML5 + CSS3**: 现代化Web标准
+- **JavaScript (ES6+)**: 交互逻辑实现
+- **Font Awesome**: 图标库
+- **Responsive Design**: 响应式布局
+
+### AI集成
+- **Ollama**: 本地大模型运行环境
+- **通义千问API**: 阿里云大模型服务
+- **Google Gemini API**: 谷歌大模型服务
+
+## 📦 安装部署
+
+### 环境要求
+- Python 3.8 或更高版本
+- MySQL 5.7+ 或 8.0+
+- 8GB+ 内存（使用本地模型时）
 
 ### 1. 克隆项目
-
 ```bash
-git clone https://github.com/liumaishenjian/natural-language-to-sql.git
-cd natural-language-to-sql
+git clone https://github.com/yourusername/sql-query-tool.git
+cd sql-query-tool
 ```
 
 ### 2. 安装依赖
-
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. 配置数据库
-
-编辑 `config.ini` 文件，填入您的MySQL数据库信息：
-
-```ini
-[mysql]
-host = YOUR_MYSQL_HOST
-port = YOUR_MYSQL_PORT
-user = YOUR_MYSQL_USER
-password = YOUR_MYSQL_PASSWORD
-database = YOUR_MYSQL_DATABASE
-```
-
-### 4. 选择使用模式
-
-#### 方式一：使用在线API（通义千问）
-
-设置通义千问API Key环境变量：
-
-**Windows:**
-```cmd
-set DASHSCOPE_API_KEY=your_api_key_here
-```
-
-**Linux/Mac:**
+### 3. 安装Ollama（可选，用于本地模型）
 ```bash
-export DASHSCOPE_API_KEY=your_api_key_here
-```
+# Windows/Mac/Linux
+curl -fsSL https://ollama.com/install.sh | sh
 
-#### 方式二：使用本地Ollama
-
-1. 安装Ollama: https://ollama.ai/
-2. 启动Ollama服务:
-```bash
+# 下载模型
+ollama pull qwen2
 ollama serve
 ```
-3. 下载模型:
+
+### 4. 配置数据库
+编辑 `config.ini` 文件：
+```ini
+[mysql]
+host = 127.0.0.1
+port = 3306
+user = root
+password = your_password
+database = your_database
+
+[api_keys]
+# 通义千问API Key (可选)
+qwen_api_key = sk-your_qwen_key
+# Google Gemini API Key (可选)
+gemini_api_key = your_gemini_key
+```
+
+### 5. 启动服务
 ```bash
-ollama pull qwen2
+python web_server.py
 ```
 
-## 使用方法
+访问 `http://localhost:5000` 即可使用！
 
-### 交互式模式
+## 🔧 配置说明
 
-**使用在线API:**
+### 数据库配置
+支持通过Web界面或配置文件设置数据库连接：
+
+**MySQL示例**:
+- 主机: `localhost`
+- 端口: `3306`
+- 用户名: `root`
+- 密码: `your_password`
+- 数据库: `your_database`
+
+### API密钥配置
+根据使用的AI模型配置相应的API密钥：
+
+**通义千问**:
+1. 访问 [阿里云DashScope](https://dashscope.aliyun.com/)
+2. 获取API Key
+3. 在配置页面输入或写入config.ini
+
+**Google Gemini**:
+1. 访问 [Google AI Studio](https://makersuite.google.com/app/apikey)
+2. 获取API Key
+3. 在配置页面输入或写入config.ini
+
+## 📖 使用指南
+
+### 基础查询
+1. **自然语言查询**:
+   - 输入: "查询所有用户信息"
+   - 生成: `SELECT * FROM sys_user`
+
+2. **复杂查询**:
+   - 输入: "统计每个部门的人数"
+   - 生成: `SELECT dept_name, COUNT(*) FROM users GROUP BY dept_id`
+
+### 高级功能
+1. **表结构选择**: 点击"选择表结构"按钮，选择相关表以提高查询准确度
+2. **结果格式**: 选择表格、JSON或CSV格式输出
+3. **模型切换**: 在快捷操作区域切换不同的AI模型
+4. **SQL模式**: 切换到SQL查询模式直接执行SQL语句
+
+### 示例查询
+- `查询所有用户信息`
+- `统计每个部门的人数`
+- `查找最近一周的订单`
+- `显示销售额最高的产品`
+- `查询库存不足的商品`
+- `显示月销售趋势`
+
+## 🔌 API文档
+
+### 查询接口
 ```bash
-python main.py --backend qwen_api
+POST /api/query
+Content-Type: application/json
+
+{
+    "query": "查询所有用户信息",
+    "mode": "natural_language"
+}
 ```
 
-**使用本地Ollama:**
+### 直接SQL执行
 ```bash
-python main.py --backend ollama
+POST /api/execute-sql
+Content-Type: application/json
+
+{
+    "sql": "SELECT * FROM users LIMIT 10"
+}
 ```
 
-然后输入自然语言查询，例如：
-- "查询所有用户信息"
-- "统计每个部门的人数"  
-- "查找年龄大于25岁的用户姓名和邮箱"
-
-### 命令行模式
-
+### 系统状态
 ```bash
-# 直接执行查询
-python main.py --query "查询所有用户" --backend ollama
-
-# 指定输出格式
-python main.py --query "查询用户统计" --format json --backend qwen_api
-
-# 使用不同的模型
-python main.py --model qwen-max --query "复杂查询" --backend qwen_api
+GET /api/status
 ```
 
-### 可用参数
-
-- `--config`: 指定配置文件路径（默认：config.ini）
-- `--backend`: 后端类型（ollama/qwen_api，默认：ollama）
-- `--model`: 指定大模型（本地：qwen2等，在线：qwen-turbo/qwen-plus/qwen-max）
-- `--query`: 直接执行的查询（非交互模式）
-- `--format`: 结果显示格式（table/json/csv/simple，默认：table）
-- `--ollama-url`: Ollama服务URL（默认：http://localhost:11434）
-
-## 安全特性
-
-### 多层安全检查
-
-1. **SQL语句类型检查**: 只允许SELECT语句
-2. **关键词过滤**: 阻止INSERT、UPDATE、DELETE等危险操作
-3. **函数检查**: 防止使用危险的MySQL函数
-4. **注入攻击检测**: 识别和阻止SQL注入模式
-5. **语法解析**: 使用sqlparse进行深度语法分析
-
-### 数据库安全建议
-
-- 使用只读数据库账号
-- 限制账号只能访问特定数据库和表
-- 在生产环境中使用专门的查询数据库
-
-## 示例查询
-
-以下是一些示例查询，展示工具的能力：
-
-```
-基础查询：
-- "显示所有用户"
-- "查看用户表的结构"
-
-条件查询：
-- "查找年龄大于30的用户"
-- "显示最近注册的10个用户"
-
-聚合查询：
-- "统计每个城市的用户数量"
-- "计算平均年龄"
-
-关联查询：
-- "显示用户及其订单信息"
-- "查找购买过产品的用户名单"
-```
-
-## 特殊命令
-
-在交互模式下，支持以下特殊命令：
-
-- `help` 或 `帮助`: 显示帮助信息
-- `schema` 或 `结构`: 显示数据库表结构
-- `models` 或 `模型`: 显示可用模型（仅Ollama）
-- `exit`, `quit` 或 `退出`: 退出程序
-
-## 测试
-
-项目包含完整的测试文件：
-
+### 配置管理
 ```bash
-# 基础功能测试（不依赖外部服务）
-python test_basic.py
+# 保存数据库配置
+POST /api/save-db-config
 
-# 完整功能演示（模拟测试）
-python demo_test.py
+# 保存模型配置
+POST /api/save-model-config
 
-# 安全功能测试
-python security_test.py
+# 获取配置
+GET /api/get-db-config
+GET /api/get-model-config
 ```
 
-## 故障排除
+## 🚨 故障排除
 
 ### 常见问题
 
-1. **大模型连接失败**
-   - 在线API：检查DASHSCOPE_API_KEY环境变量是否正确设置
-   - 本地Ollama：确保Ollama服务正在运行并已下载模型
+**1. Ollama连接失败**
+```bash
+# 检查Ollama服务状态
+ollama list
 
-2. **数据库连接失败**
-   - 检查config.ini中的数据库配置
-   - 确认数据库服务正在运行
-   - 验证账号密码和网络连接
+# 重启Ollama服务
+ollama serve
 
-3. **SQL生成质量不佳**
-   - 尝试更具体的查询描述
-   - 使用更高级的模型（如qwen-max）
-   - 确保数据库表结构清晰且有意义的字段名
+# 重新下载模型
+ollama pull qwen2
+```
 
-## 开发和扩展
+**2. 数据库连接失败**
+- 检查MySQL服务是否运行
+- 验证用户名密码是否正确
+- 确认数据库名称存在
+- 检查防火墙设置
 
-### 添加新功能
+**3. API调用失败**
+- 验证API Key是否正确
+- 检查网络连接
+- 确认API配额是否充足
 
-本项目采用模块化设计，易于扩展：
+**4. 前端页面异常**
+- 清除浏览器缓存
+- 检查浏览器控制台错误信息
+- 确认服务器正常运行
 
-- `database_connector.py`: 添加对其他数据库的支持
-- `llm_sql_generator.py`: 集成其他大模型API
-- `ollama_sql_generator.py`: 支持更多本地模型
-- `sql_security_checker.py`: 增强安全检查规则
-- `result_formatter.py`: 添加新的输出格式
+### 日志分析
+查看服务器终端输出的详细日志信息：
+- `✅` 表示操作成功
+- `⚠️` 表示警告信息
+- `❌` 表示错误信息
+- `🔄` 表示正在处理
 
-### 贡献代码
+## 🤝 贡献指南
 
-欢迎提交Issue和Pull Request来改进项目！
+欢迎提交Issue和Pull Request来改进这个项目！
 
-## 许可证
+### 开发环境设置
+1. Fork项目仓库
+2. 创建功能分支: `git checkout -b feature/new-feature`
+3. 提交更改: `git commit -am 'Add new feature'`
+4. 推送分支: `git push origin feature/new-feature`
+5. 提交Pull Request
 
-本项目采用MIT许可证开源。
+### 代码规范
+- 遵循PEP 8 Python代码规范
+- 使用有意义的变量和函数名
+- 添加必要的注释和文档字符串
+- 确保代码测试覆盖率
 
-## 注意事项
+## 📄 许可证
 
-- 本工具仅用于数据查询，不支持数据修改操作
-- 生成的SQL语句会经过安全检查，确保数据安全
-- 大模型API调用可能产生费用，请注意使用量
-- 建议在测试环境中充分验证后再用于生产环境
-- 本地Ollama模型需要足够的计算资源，建议8GB以上内存
+本项目采用 MIT 许可证。详情请参阅 [LICENSE](LICENSE) 文件。
+
+## 🙏 致谢
+
+- [Ollama](https://ollama.com/) - 本地大模型运行环境
+- [阿里云通义千问](https://dashscope.aliyun.com/) - 在线AI模型服务
+- [Google Gemini](https://ai.google.dev/) - 谷歌AI模型服务
+- [Flask](https://flask.palletsprojects.com/) - Python Web框架
+- [Font Awesome](https://fontawesome.com/) - 图标库
+
+## 📞 联系方式
+
+如有问题或建议，请通过以下方式联系：
+
+- 📧 Email: your.email@example.com
+- 🐛 Issues: [GitHub Issues](https://github.com/yourusername/sql-query-tool/issues)
+- 💬 讨论: [GitHub Discussions](https://github.com/yourusername/sql-query-tool/discussions)
+
+---
+
+⭐ 如果这个项目对您有帮助，请给我们一个Star！ 
